@@ -31,7 +31,8 @@ local function newUid(data: Data): number
 	return uid
 end
 
-local function noteIndex(data: Data, id: string, tier: number, now: number)
+-- Records that the player now has (or has had) a part, keeping the first time and the best tier.
+function Crafting.noteIndex(data: Data, id: string, tier: number, now: number)
 	local e = data.index[id]
 	if e == nil then
 		data.index[id] = { first = now, best = tier }
@@ -44,7 +45,7 @@ end
 function Crafting.addPart(cfg: Settings, data: Data, def: Parts.Def, rng: any, now: number, luck: number?): Item
 	local item: Item = { uid = newUid(data), id = def.id, tier = 1, stats = Parts.roll(cfg.Rarity, def, rng, luck) }
 	table.insert(data.parts, item)
-	noteIndex(data, def.id, 1, now)
+	Crafting.noteIndex(data, def.id, 1, now)
 	return item
 end
 
@@ -130,7 +131,7 @@ function Crafting.merge(cfg: Settings, data: Data, id: string, tier: number, now
 	end
 	table.insert(kept, { uid = newUid(data), id = id, tier = tier + 1, stats = avg })
 	data.parts = kept
-	noteIndex(data, id, tier + 1, now)
+	Crafting.noteIndex(data, id, tier + 1, now)
 	return true, "ok"
 end
 

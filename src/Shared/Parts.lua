@@ -61,6 +61,13 @@ function Parts.get(id: string): Def?
 	return byId[id]
 end
 
+-- Whether a part can be traded. Parts are tradable unless their catalog entry says `tradable = false` (event parts
+-- can be made non-tradable, spec section 8).
+function Parts.isTradable(id: string): boolean
+	local def = byId[id] :: any
+	return def ~= nil and def.tradable ~= false
+end
+
 function Parts.count(): number
 	return #all
 end

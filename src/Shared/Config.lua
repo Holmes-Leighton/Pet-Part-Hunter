@@ -108,6 +108,34 @@ local Config = {
 		{ id = "CandyPainting", name = "Candy Painting", surface = "wall", w = 2, d = 2, h = 1, premium = true, product = 0, robux = 59, color = { 190, 120, 255 } },
 	} :: any),
 
+	-- Trading (spec section 5). Players trade parts and finished pets; Robux-bought items are not tradable.
+	-- Eligibility is account age OR speed level (spec: "minimum level or account age").
+	Trade = {
+		Enabled = true, -- live switch (admin tools flip it without a restart, spec section 8)
+		MinAccountAgeDays = 7,
+		MinLevel = 5,
+		ConfirmDelay = 3, -- seconds after the last change before anyone can confirm, so nothing can be swapped at the last second
+		MaxItemsPerSide = 12,
+		CooldownSeconds = 30, -- between a player's completed trades
+		InviteSeconds = 30, -- how long a trade request waits for an answer
+		IdleSeconds = 300, -- a trade window with no activity closes
+		PetValueMultiplier = 4, -- a pet is worth its parts times this (it consumed them and cannot be taken apart)
+		LopsidedRatio = 3, -- one side gives more than this many times what it gets...
+		LopsidedMinDifference = 100, -- ...and the gap is at least this many coins of value: warn and require an acknowledgement
+		VolumePerHour = 10, -- completed trades per player per hour above which the exploit log flags them
+	},
+
+	-- Where trade records go (spec section 9: log every trade). A record is written to this DataStore before the items
+	-- move, plus a per-player index for quick review, and optionally POSTed to your own backend. If a record cannot be
+	-- saved, the trade does not happen.
+	Backend = {
+		TradeStore = "PetPartHunterTradeLog_v1",
+		MaxIndexPerPlayer = 200, -- recent trades remembered per player in the index
+		SaveRetries = 3,
+		TradeLogUrl = "", -- your backend endpoint; empty = DataStore only. Needs HttpService enabled
+		SecretName = "TradeLogKey", -- name of the Roblox secret holding the backend API key (never put the key in code)
+	},
+
 	-- Pets shown in the world (client side). Every player's equipped pets are visible to everyone, following their owner
 	-- around the lobby and wandering in the owner's house. Limits keep this cheap on phones (spec section 6).
 	PetDisplay = {
@@ -148,6 +176,7 @@ local Config = {
 		BuyPad = { perSecond = 1, burst = 3 },
 		Craft = { perSecond = 2, burst = 5 },
 		Economy = { perSecond = 3, burst = 6 },
+		Trade = { perSecond = 4, burst = 10 },
 	},
 
 	Data = {
