@@ -117,6 +117,24 @@ local Config = {
 		TagFromRarity = 4, -- pets with a part at least this rarity (index in Areas; 4 = Super Rare) get a rarity tag
 	},
 
+	-- Purchase announcements: when someone buys something with Robux everyone sees it in chat and as a notification
+	-- (social proof, spec section 7). Rate limited per buyer so nobody can spam the chat.
+	Announce = {
+		Enabled = true,
+		PerSecond = 0.25, -- sustained announcements per buyer
+		Burst = 3,
+		ToastSeconds = 5,
+		MaxToasts = 3, -- on screen at once; older ones are pushed out
+	},
+
+	-- Display names for what can be bought, used in announcements.
+	PassNames = {
+		Area_SuperRare = "the Super Rare Area Pass",
+		Area_Legendary = "the Legendary Area Pass",
+		Area_Mythic = "the Mythic Area Pass",
+		AllAreas = "the All Areas Bundle",
+	},
+
 	-- Remote rate limits (spec section 9).
 	RateLimit = {
 		Home = { perSecond = 4, burst = 8 },

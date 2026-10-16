@@ -16,6 +16,7 @@ local Config = require(Shared:WaitForChild("Config"))
 
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local Announcer = require(script.Parent:WaitForChild("Announcer"))
 
 local AreaAccess = {}
 
@@ -112,6 +113,7 @@ function AreaAccess.start(notify: RemoteEvent)
 			if id > 0 and id == passId then
 				Analytics.log(player, "PassPurchased", passId)
 				grantPass(player, key)
+				Announcer.purchase(player, (Config.PassNames :: any)[key] or key)
 			end
 		end
 	end)

@@ -272,7 +272,7 @@ Test.case("public pets: only equipped pets, only part ids and tiers, in equip or
 	Test.eq(pub[1].uid, made[2])
 	Test.eq(pub[2].uid, made[1])
 	Test.eq(pub[1].slots, { Head = { id = "Chicken_Head", tier = 1 }, Legs = { id = "Tiger_Legs", tier = 1 } })
-	Test.eq(pub[1].slots.Head.stats, nil, "stats stay private")
+	Test.eq((pub[1].slots.Head :: any).stats, nil, "stats stay private")
 end)
 
 Test.done()
