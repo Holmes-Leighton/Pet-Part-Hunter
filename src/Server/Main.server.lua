@@ -23,11 +23,14 @@ local PartSpawner = require(Shared:WaitForChild("PartSpawner"))
 local Run = require(Shared:WaitForChild("Run"))
 local Parts = require(Shared:WaitForChild("Parts"))
 local Crafting = require(Shared:WaitForChild("Crafting"))
+local Economy = require(Shared:WaitForChild("Economy"))
 
 local AreaAccess = require(script.Parent:WaitForChild("AreaAccess"))
 local AreaBuilder = require(script.Parent:WaitForChild("AreaBuilder"))
 local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
+local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
+local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local HomeService = require(script.Parent:WaitForChild("HomeService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Progression = require(script.Parent:WaitForChild("Progression"))
@@ -252,6 +255,9 @@ CraftService.start(function(player)
 	return runs[player] ~= nil
 end, notify)
 AreaAccess.start(notify)
+EconomyService.start(function(player)
+	return runs[player] ~= nil
+end, notify)
 HomeService.start(function(player)
 	return runs[player] ~= nil
 end, notify, lobby.spawn)
@@ -278,7 +284,7 @@ local function startRun(player: Player, ctx: AreaCtx)
 	end
 	local sx, sz = cellLocal(ctx.layout.chaserStart)
 	local run = Run.new({
-		bag = Bag.new(Config.Bag.StartCapacity + Crafting.equippedStats(Config, data).bag),
+		bag = Bag.new(Economy.bagCapacity(Config, data)),
 		chaser = Chaser.new(ctx.grid, sx, sz, chaserSpeed(ctx.def)),
 		spawner = ctx.spawner,
 		timer = EscapeTimer.new(Config.Escape.HoldSeconds),
@@ -365,7 +371,18 @@ RunService.Heartbeat:Connect(function(dt)
 				local lost = e.lost or {}
 				local ex, ez = entranceWorld(ctx)
 				teleport(player, ex, 3, ez)
-				notify:FireClient(player, string.format("CAUGHT! You lost %d part(s). Back to the start.", #lost))
+				local data = PlayerData.get(player)
+				if #lost > 0 and data and Economy.useInsurance(data) then
+					-- Bag insurance (Robux): one use keeps the bag when caught.
+					for _, part in lost do
+						pr.run.bag:add(part)
+					end
+					Analytics.log(player, "InsuranceUsed", #lost)
+					EconomyService.publish(player)
+					notify:FireClient(player, string.format("CAUGHT! Insurance saved your %d part(s). Back to the start.", #lost))
+				else
+					notify:FireClient(player, string.format("CAUGHT! You lost %d part(s). Back to the start.", #lost))
+				end
 			elseif e.type == "escaped" then
 				local parts = e.parts or {}
 				local data = PlayerData.get(player)
@@ -374,7 +391,7 @@ RunService.Heartbeat:Connect(function(dt)
 						-- Bag parts are spawn instances (id "part-N"); the catalog id is Species_Slot.
 						local def = Parts.get(part.species .. "_" .. part.slot)
 						if def then
-							Crafting.addPart(Config, data, def, rollRng, os.time())
+							Crafting.addPart(Config, data, def, rollRng, os.time(), Economy.luck(Config, data, os.time()))
 						end
 					end
 					CraftService.push(player)

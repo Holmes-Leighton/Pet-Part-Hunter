@@ -10,6 +10,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Crafting = require(Shared:WaitForChild("Crafting"))
+local Economy = require(Shared:WaitForChild("Economy"))
 local Parts = require(Shared:WaitForChild("Parts"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 
@@ -33,7 +34,7 @@ end
 local notifyRemote: RemoteEvent? = nil
 
 local function itemView(item: Crafting.Item): any
-	return { uid = item.uid, id = item.id, tier = item.tier, stats = Crafting.itemStats(Config, item) }
+	return { uid = item.uid, id = item.id, tier = item.tier, stats = Crafting.itemStats(Config, item), base = Economy.sellValue(Config, item) }
 end
 
 -- Sends the player their inventory, pets, Part Index progress and the rules the UI needs to show.
@@ -76,6 +77,12 @@ function CraftService.push(player: Player)
 		mergeCount = Config.MergeCount,
 		tiers = Config.Tiers,
 		totals = Crafting.equippedStats(Config, data),
+		coinMult = Economy.coinMultiplier(Config, data),
+		bagCapacity = Economy.bagCapacity(Config, data),
+		bagCost = Economy.bagUpgradeCost(Config, data.bagUpgrades) or -1, -- -1 = fully upgraded
+		bagBought = data.bagUpgrades,
+		bagMax = Config.Economy.BagUpgrade.max,
+		petSlotCost = Economy.petSlotCost(Config, data) or -1, -- -1 = none to buy with coins
 	})
 end
 

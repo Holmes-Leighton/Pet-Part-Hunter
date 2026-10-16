@@ -133,6 +133,12 @@ local Config = {
 		Area_Legendary = "the Legendary Area Pass",
 		Area_Mythic = "the Mythic Area Pass",
 		AllAreas = "the All Areas Bundle",
+		DoubleSpeed = "the 2x Speed Pass",
+		DoubleCoins = "the 2x Coins Pass",
+		ExtraBag1 = "the Bigger Bag Pass (+2)",
+		ExtraBag2 = "the Huge Bag Pass (+4)",
+		ExtraPetSlots = "the Extra Pet Slots Pass",
+		HouseExpansion = "the House Expansion Pass",
 	},
 
 	-- Remote rate limits (spec section 9).
@@ -141,6 +147,7 @@ local Config = {
 		Rebirth = { perSecond = 0.5, burst = 2 },
 		BuyPad = { perSecond = 1, burst = 3 },
 		Craft = { perSecond = 2, burst = 5 },
+		Economy = { perSecond = 3, burst = 6 },
 	},
 
 	Data = {
@@ -152,6 +159,7 @@ local Config = {
 
 	Bag = {
 		StartCapacity = 3, -- (spec)
+		MaxCapacity = 12, -- hard ceiling after upgrades, passes and pets (the bag UI draws this many slots)
 	},
 
 	Maze = {
@@ -183,6 +191,33 @@ local Config = {
 		Area_Legendary = 0,
 		Area_Mythic = 0,
 		AllAreas = 0,
+		DoubleSpeed = 0, -- doubles Speed gained, never the WalkSpeed cap (spec section 7)
+		DoubleCoins = 0, -- doubles coins from selling and events
+		ExtraBag1 = 0, -- bag +2 (tiered, spec section 7)
+		ExtraBag2 = 0, -- bag +4 (replaces ExtraBag1)
+		ExtraPetSlots = 0, -- equip up to the maximum of 6 pets
+		HouseExpansion = 0, -- raises the house item limit
+	},
+
+	-- Repeatable developer products (spec section 7). id 0 = not set up yet: create them on Roblox and put the IDs here.
+	-- Parts, chaser skips and escape skips are never sold (spec: the hunt stays earned).
+	Products = ({
+		CoinPackSmall = { id = 0, name = "a Small Coin Pack", coins = 2000 },
+		CoinPackMedium = { id = 0, name = "a Medium Coin Pack", coins = 12000 },
+		CoinPackLarge = { id = 0, name = "a Large Coin Pack", coins = 60000 },
+		LuckBoost = { id = 0, name = "a 30 minute Luck Boost", seconds = 1800, luck = 100 }, -- luck % while active
+		Insurance = { id = 0, name = "Bag Insurance", uses = 1 }, -- keep the bag if caught, one use
+	} :: any),
+
+	-- Coins (spec section 7). Selling is the main source; sinks must grow so coins do not pile up.
+	Economy = {
+		SellPrice = ({ Common = 5, Uncommon = 15, Rare = 50, SuperRare = 150, Legendary = 500, Mythic = 2000 } :: any),
+		TierPriceMultiplier = { 1, 1.5, 2.5 }, -- by merge tier: higher tiers sell for more (spec section 5)
+		SellBatchLimit = 300, -- most parts one sell request may name
+		BagUpgrade = { max = 5, baseCost = 150, growth = 2.5 }, -- +1 bag slot each; cost = baseCost * growth^(bought)
+		BagPass = { ExtraBag1 = 2, ExtraBag2 = 4 },
+		PetSlotCost = { [3] = 2000, [4] = 8000 }, -- coins; slots 5 and 6 come with the ExtraPetSlots pass
+		MaxReceipts = 200, -- recent purchase receipts remembered, so a repeated receipt is never granted twice
 	},
 
 	Chase = {

@@ -94,6 +94,19 @@ function PlayerData.get(player: Player): Profile.Data?
 	return e and e.data
 end
 
+-- Saves one player's data right now (used before confirming a Robux purchase, so a granted purchase is never lost).
+-- Returns true when saved, or when there is nowhere to save (temporary data in Studio); false if the save failed.
+function PlayerData.saveNow(player: Player): boolean
+	local entry = entries[player]
+	if entry == nil then
+		return false
+	end
+	if not entry.persistent then
+		return true
+	end
+	return write(player, entry, false)
+end
+
 -- Calls fn(player, data) once a player's data has loaded (immediately for players already loaded).
 function PlayerData.onLoaded(fn: (Player, Profile.Data) -> ())
 	table.insert(onLoaded, fn)

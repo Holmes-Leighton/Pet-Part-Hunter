@@ -98,9 +98,15 @@ local function round2(v: number): number
 end
 
 -- Rolls a part's base stats (before the quality-tier multiplier) when it drops. rng:next() is in [0, 1).
-function Parts.roll(rarityRanges: any, def: Def, rng: { next: (any) -> number }): Stats
+-- `luck` (a percentage, from pets and boosts) pushes the roll towards the top of the range: the roll is raised to
+-- 1 / (1 + luck/100), so 100% luck turns the average roll from 0.5 into about 0.67 and never exceeds the range.
+function Parts.roll(rarityRanges: any, def: Def, rng: { next: (any) -> number }, luck: number?): Stats
 	local range = rarityRanges[def.rarity]
-	local quality = range.min + (range.max - range.min) * rng:next()
+	local u = rng:next()
+	if luck and luck > 0 then
+		u = u ^ (1 / (1 + luck / 100))
+	end
+	local quality = range.min + (range.max - range.min) * u
 	local stats: Stats = { speed = 0, bag = 0, coin = 0, luck = 0 }
 	for stat, weight in Parts.StatWeights[def.slot] do
 		(stats :: any)[stat] = round2(quality * weight)

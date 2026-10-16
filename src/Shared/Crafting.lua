@@ -41,8 +41,8 @@ local function noteIndex(data: Data, id: string, tier: number, now: number)
 end
 
 -- A part a player has just escaped with: roll its stats, add it to the inventory, fill in the Part Index.
-function Crafting.addPart(cfg: Settings, data: Data, def: Parts.Def, rng: any, now: number): Item
-	local item: Item = { uid = newUid(data), id = def.id, tier = 1, stats = Parts.roll(cfg.Rarity, def, rng) }
+function Crafting.addPart(cfg: Settings, data: Data, def: Parts.Def, rng: any, now: number, luck: number?): Item
+	local item: Item = { uid = newUid(data), id = def.id, tier = 1, stats = Parts.roll(cfg.Rarity, def, rng, luck) }
 	table.insert(data.parts, item)
 	noteIndex(data, def.id, 1, now)
 	return item

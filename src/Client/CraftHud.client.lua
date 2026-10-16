@@ -9,6 +9,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Parts = require(Shared:WaitForChild("Parts"))
 local request = ReplicatedStorage:WaitForChild("CraftRequest") :: RemoteEvent
+local economy = ReplicatedStorage:WaitForChild("EconomyRequest") :: RemoteEvent
 local stateRemote = ReplicatedStorage:WaitForChild("InventoryState") :: RemoteEvent
 
 local player = Players.LocalPlayer
@@ -308,15 +309,79 @@ local function renderIndex()
 	end
 end
 
+-- Sell: parts grouped by kind and tier. Spares are everything except your best copy, so selling never costs you
+-- the part you would put in a pet or merge. Prices include your coin bonuses.
+local function renderSell()
+	local mult = inv.coinMult or 1
+	row(string.format("Coin bonus x%.2f applies to every sale", mult), "SELL SPARES", Color3.fromRGB(230, 130, 40), function()
+		economy:FireServer("SellAllSpares")
+	end)
+	local groups: { [string]: { id: string, tier: number, n: number, base: number, uids: { number } } } = {}
+	local order: { string } = {}
+	for _, it in inv.parts do
+		local key = it.id .. "#" .. it.tier
+		if groups[key] == nil then
+			groups[key] = { id = it.id, tier = it.tier, n = 0, base = it.base or 0, uids = {} }
+			table.insert(order, key)
+		end
+		groups[key].n += 1
+		table.insert(groups[key].uids, it.uid)
+	end
+	table.sort(order)
+	if #order == 0 then
+		row("No parts to sell.", nil)
+	end
+	for _, key in order do
+		local g = groups[key]
+		local each = math.floor(g.base * mult + 1e-9)
+		local label = string.format("%s [%s] x%d  (%d coins each)", pretty(g.id), tierName(g.tier), g.n, each)
+		if g.n > 1 then
+			row(label, "SELL SPARES", Color3.fromRGB(60, 150, 80), function()
+				economy:FireServer("SellDuplicates", g.id, g.tier, 1)
+			end)
+		else
+			row(label, "SELL", Color3.fromRGB(190, 80, 60), function()
+				economy:FireServer("Sell", g.uids)
+			end)
+		end
+	end
+end
+
+-- Upgrades: coin sinks that grow in cost (spec section 7).
+local function renderUpgrades()
+	local bagLabel = string.format("Bag: %d slots  (upgrades %d/%d)", inv.bagCapacity, inv.bagBought, inv.bagMax)
+	if inv.bagCost >= 0 then
+		local can = inv.coins >= inv.bagCost
+		row(bagLabel, inv.bagCost .. " coins", if can then Color3.fromRGB(60, 150, 80) else Color3.fromRGB(90, 90, 90), function()
+			economy:FireServer("BuyBag")
+		end)
+	else
+		row(bagLabel, "MAX", Color3.fromRGB(90, 90, 90), nil)
+	end
+	local slotLabel = string.format("Pet slots: %d / 6", inv.petSlots)
+	if inv.petSlots >= 6 then
+		row(slotLabel, "MAX", Color3.fromRGB(90, 90, 90), nil)
+	elseif inv.petSlotCost >= 0 then
+		local can = inv.coins >= inv.petSlotCost
+		row(slotLabel, inv.petSlotCost .. " coins", if can then Color3.fromRGB(60, 150, 80) else Color3.fromRGB(90, 90, 90), function()
+			economy:FireServer("BuyPetSlot")
+		end)
+	else
+		row(slotLabel .. "  (last slots: Extra Pet Slots pass)", "PASS", Color3.fromRGB(90, 90, 90), nil)
+	end
+end
+
 local tabs: { { name: string, draw: () -> () } } = {
 	{ name = "Build", draw = renderBuild },
 	{ name = "Merge", draw = renderMerge },
+	{ name = "Sell", draw = renderSell },
 	{ name = "Pets", draw = renderPets },
+	{ name = "Upgrades", draw = renderUpgrades },
 	{ name = "Index", draw = renderIndex },
 }
 local tabButtons: { [string]: TextButton } = {}
 for _, tab in tabs do
-	local b = button(tabRow, string.upper(tab.name), UDim2.new(0.25, -6, 1, 0), Color3.fromRGB(110, 80, 60))
+	local b = button(tabRow, string.upper(tab.name), UDim2.new(1 / #tabs, -6, 1, 0), Color3.fromRGB(110, 80, 60))
 	tabButtons[tab.name] = b
 	b.Activated:Connect(function()
 		currentTab = tab.name

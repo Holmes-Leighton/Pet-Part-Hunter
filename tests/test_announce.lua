@@ -31,7 +31,7 @@ Test.case("others see 'X just bought Y!', the buyer sees 'You bought Y!'", funct
 end)
 
 Test.case("every pass has a display name, and announcements are rate limited by config", function()
-	for key in Config.Passes do
+	for key in Config.Passes :: any do
 		Test.truthy((Config.PassNames :: any)[key] ~= nil, key .. " needs a PassNames entry")
 	end
 	Test.truthy(Config.Announce.PerSecond > 0 and Config.Announce.Burst >= 1)

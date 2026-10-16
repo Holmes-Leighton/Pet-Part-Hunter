@@ -14,7 +14,8 @@ See [docs/GAME_DESIGN_SPEC.md](docs/GAME_DESIGN_SPEC.md) for the full design spe
 | 4. Part pipeline: part table, inventory, merge, pet building, Part Index, crafting UI | Done for all 48 placeholder species (shared pet rig, meshes and animations come with the art pipeline) |
 | 5. All six areas, chaser scaling, gamepass and rebirth gating | Done (area mazes, 48 species, per-area chaser speed, free route + pass early access; pass IDs in Config.Passes are 0 until you create the passes) |
 | 6. Home building (plot, starter room, furniture shop, placement ghost, move/rotate/delete, visitors, pets wandering) | Done |
-| 7. Economy: selling parts, coins, bag upgrades, Robux products | Next |
+| 7. Economy: selling parts, bag upgrades, pet slots, passes, Robux products (coin packs, luck boost, insurance), receipt handling, purchase announcements, everyone sees everyone's pets | Done (pass and product IDs in Config are 0 until you create them on Roblox) |
+| 8. Trading | Next |
 ## Running
 
 - Pure-logic tests: `python tests/run_tests.py` (set `LUAU` and `LUAU_ANALYZE` to the luau tool paths if they are not on PATH).

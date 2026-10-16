@@ -4,6 +4,7 @@
 
 local Areas = require("./Areas")
 local Crafting = require("./Crafting")
+local Economy = require("./Economy")
 local House = require("./House")
 local Parts = require("./Parts")
 local Speed = require("./Speed")
@@ -24,11 +25,16 @@ export type Data = {
 	index: { [string]: { first: number, best: number } }, -- Part Index: first time found, best tier owned
 	nextUid: number, -- next unique id for parts and pets
 	petSlots: number, -- how many pets can be equipped
+	bagUpgrades: number, -- bought bag slots
+	insurance: number, -- unused bag insurance charges
+	luckUntil: number, -- epoch seconds a luck boost runs until
+	receipts: { string }, -- recent purchase receipts (never grant one twice)
+	stats: { coinsEarned: number, coinsSpent: number }, -- lifetime totals, for monitoring the economy
 	furniture: { [string]: number }, -- owned furniture not placed in the house
 	house: House.HouseData, -- placed layout and visitor list
 }
 
-export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any, Areas: any, Passes: any, Chase: any, Maze: any, Parts: any, House: any, Furniture: any }
+export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any, Areas: any, Passes: any, Chase: any, Maze: any, Parts: any, House: any, Furniture: any, Economy: any, Products: any, Bag: any }
 
 function Profile.default(version: number, startSlots: number?): Data
 	return {
@@ -45,6 +51,11 @@ function Profile.default(version: number, startSlots: number?): Data
 		index = {},
 		nextUid = 1,
 		petSlots = startSlots or 2,
+		bagUpgrades = 0,
+		insurance = 0,
+		luckUntil = 0,
+		receipts = {},
+		stats = { coinsEarned = 0, coinsSpent = 0 },
 		furniture = {},
 		house = { version = 1, items = {}, allow = {} },
 	}
@@ -140,6 +151,20 @@ function Profile.load(raw: any, cfg: Settings): Data
 		end
 	end
 	Areas.refreshUnlocks(cfg, out) -- free areas, plus anything the saved rebirths or passes already earn
+	out.bagUpgrades = whole(raw.bagUpgrades, 0, cfg.Economy.BagUpgrade.max)
+	out.insurance = whole(raw.insurance, 0, 9999)
+	out.luckUntil = nonNegative(raw.luckUntil, 0)
+	if type(raw.receipts) == "table" then
+		for _, r in raw.receipts do
+			if type(r) == "string" and #r <= 64 and #out.receipts < cfg.Economy.MaxReceipts then
+				table.insert(out.receipts, r)
+			end
+		end
+	end
+	if type(raw.stats) == "table" then
+		out.stats.coinsEarned = nonNegative(raw.stats.coinsEarned, 0)
+		out.stats.coinsSpent = nonNegative(raw.stats.coinsSpent, 0)
+	end
 	out.petSlots = math.clamp(whole(raw.petSlots, cfg.Pets.StartSlots, cfg.Pets.MaxSlots), cfg.Pets.StartSlots, cfg.Pets.MaxSlots)
 	if type(raw.equippedPets) == "table" then
 		for _, uid in raw.equippedPets do
@@ -181,6 +206,7 @@ function Profile.load(raw: any, cfg: Settings): Data
 		out.furniture[id] = (out.furniture[id] or 0) + n
 	end
 	out.nextUid = math.max(whole(raw.nextUid, 1, 2 ^ 52), maxUid + 1)
+	Economy.applyPasses(cfg, out)
 	return out
 end
 
