@@ -4,6 +4,7 @@
 
 local Areas = require("./Areas")
 local Crafting = require("./Crafting")
+local House = require("./House")
 local Parts = require("./Parts")
 local Speed = require("./Speed")
 
@@ -23,10 +24,11 @@ export type Data = {
 	index: { [string]: { first: number, best: number } }, -- Part Index: first time found, best tier owned
 	nextUid: number, -- next unique id for parts and pets
 	petSlots: number, -- how many pets can be equipped
-	house: { any },
+	furniture: { [string]: number }, -- owned furniture not placed in the house
+	house: House.HouseData, -- placed layout and visitor list
 }
 
-export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any, Areas: any, Passes: any, Chase: any, Maze: any, Parts: any }
+export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any, Areas: any, Passes: any, Chase: any, Maze: any, Parts: any, House: any, Furniture: any }
 
 function Profile.default(version: number, startSlots: number?): Data
 	return {
@@ -43,7 +45,8 @@ function Profile.default(version: number, startSlots: number?): Data
 		index = {},
 		nextUid = 1,
 		petSlots = startSlots or 2,
-		house = {},
+		furniture = {},
+		house = { version = 1, items = {}, allow = {} },
 	}
 end
 
@@ -165,10 +168,19 @@ function Profile.load(raw: any, cfg: Settings): Data
 			e.best = item.tier
 		end
 	end
-	out.nextUid = math.max(whole(raw.nextUid, 1, 2 ^ 52), maxUid + 1)
-	if type(raw.house) == "table" then
-		out.house = raw.house
+	if type(raw.furniture) == "table" then
+		for id, n in raw.furniture do
+			if type(id) == "string" and House.def(cfg, id) then
+				out.furniture[id] = whole(n, 0, 9999)
+			end
+		end
 	end
+	local refunds
+	out.house, refunds = House.load(cfg, raw.house, House.limit(cfg, out), claimUid)
+	for id, n in refunds do
+		out.furniture[id] = (out.furniture[id] or 0) + n
+	end
+	out.nextUid = math.max(whole(raw.nextUid, 1, 2 ^ 52), maxUid + 1)
 	return out
 end
 

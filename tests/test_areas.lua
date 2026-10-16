@@ -82,36 +82,94 @@ Test.case("generation is deterministic: same area, same maze on every server", f
 	Test.eq(l1.spawnCells, l2.spawnCells)
 end)
 
-Test.case("part pools: each area hunts its own rarity, lower areas mix in the tier below, Special parts drift in", function()
-	local function share(templates: { Parts.Template }, rarity: string): number
-		local total, mine = 0.0, 0.0
+local function share(templates: { Parts.Template }, rarity: string): number
+	local total, mine = 0.0, 0.0
+	for _, t in templates do
+		total += t.weight or 1
+		if t.rarity == rarity then
+			mine += t.weight or 1
+		end
+	end
+	return mine / total
+end
+
+Test.case("an area's name is its highest rarity: lower rarities spawn too, higher ones never (except drifting Specials)", function()
+	for i, d in Config.Areas do
+		local templates = Areas.templates(Config, d)
 		for _, t in templates do
-			total += t.weight or 1
-			if t.rarity == rarity then
-				mine += t.weight or 1
+			local rarityIndex = Areas.index(Config, t.rarity) :: number
+			if rarityIndex > i then
+				Test.eq(t.slot, "Special", d.name .. ": only Special parts come from above")
 			end
 		end
-		return mine / total
-	end
-	local common = Areas.templates(Config, def("Common"))
-	Test.truthy(share(common, "Common") > 0.9, "Common area is mostly Common parts")
-	local unc = Areas.templates(Config, def("Uncommon"))
-	Test.truthy(share(unc, "Uncommon") > 0.6 and share(unc, "Common") > 0.05, "Uncommon: Uncommon plus some Common")
-	local rare = Areas.templates(Config, def("Rare"))
-	Test.truthy(share(rare, "Rare") > 0.6 and share(rare, "Uncommon") > 0.05, "Rare: Rare plus some Uncommon")
-	local mythic = Areas.templates(Config, def("Mythic"))
-	Test.truthy(share(mythic, "Mythic") > 0.7, "Mythic: mostly Mythic")
-	local specials = 0
-	for _, t in mythic do
-		if t.rarity ~= "Mythic" then
-			Test.eq(t.slot, "Special", "only Special parts come from other areas")
-			specials += 1
+		-- Every lower rarity is present.
+		for lower = 1, i do
+			Test.truthy(share(templates, Config.Areas[lower].name) > 0, d.name .. " spawns " .. Config.Areas[lower].name)
 		end
 	end
-	Test.eq(specials, 40, "Special parts of the 5 other areas (8 species each)")
-	for _, t in rare do
-		Test.truthy(Parts.get(t.species .. "_" .. t.slot) ~= nil, "template maps to a catalog part")
+end)
+
+Test.case("the area's own rarity is about 10% of finds in every area above Common; Common is all Common", function()
+	local common = Areas.templates(Config, def("Common"))
+	Test.truthy(share(common, "Common") > 0.95, "Common area is Common parts (plus a few drifting Specials)")
+	for i = 2, #Config.Areas do
+		local d = Config.Areas[i]
+		local s = share(Areas.templates(Config, d), d.name)
+		Test.truthy(s > 0.085 and s < 0.105, string.format("%s: own rarity share %.3f", d.name, s))
 	end
+end)
+
+Test.case("a mid rarity is rarer in its own area than in a higher area (Rare is a bigger share of Mythic than of Rare)", function()
+	local inRare = share(Areas.templates(Config, def("Rare")), "Rare")
+	local inMythic = share(Areas.templates(Config, def("Mythic")), "Rare")
+	Test.truthy(inMythic > inRare, string.format("Rare: %.3f in Rare vs %.3f in Mythic", inRare, inMythic))
+	local inLegendary = share(Areas.templates(Config, def("Legendary")), "Rare")
+	Test.truthy(inLegendary > inRare)
+end)
+
+Test.case("the top rarity is the rarest thing in its own area, and rarity gets scarcer the nearer the top", function()
+	for i = 2, #Config.Areas do
+		local shares = Areas.rarityShares(Config, Config.Areas[i])
+		local top = shares[Config.Areas[i].name]
+		local prev = top
+		for lower = i - 1, 1, -1 do
+			local s = shares[Config.Areas[lower].name]
+			Test.truthy(s >= top - 1e-9, Config.Areas[i].name .. ": " .. Config.Areas[lower].name .. " is at least as common as the top rarity")
+			Test.truthy(s <= (if lower == i - 1 then 1 else prev) + 1e-9, "tiers further below the top are not commoner than the one above them")
+			prev = s
+		end
+	end
+	local m = Areas.rarityShares(Config, def("Mythic"))
+	Test.near(m.Mythic, 0.10, 1e-9)
+	Test.truthy(m.Legendary > m.SuperRare and m.SuperRare > m.Rare and m.Rare > m.Uncommon and m.Uncommon > m.Common)
+end)
+
+Test.case("every area's weights add up to 1, and every template maps to a catalog part", function()
+	for _, d in Config.Areas do
+		local total = 0.0
+		for _, t in Areas.templates(Config, d) do
+			total += t.weight :: number
+			Test.truthy(Parts.get(t.species .. "_" .. t.slot) ~= nil, "template maps to a catalog part")
+		end
+		Test.near(total, 1, 1e-9, d.name)
+	end
+end)
+
+Test.case("Special parts of higher rarities drift into lower areas at a low rate", function()
+	local drift = 0.0
+	for _, t in Areas.templates(Config, def("Common")) do
+		if t.rarity ~= "Common" then
+			drift += t.weight :: number
+		end
+	end
+	Test.near(drift, Config.Parts.SpecialDrift, 1e-9)
+	local mythicAbove = 0
+	for _, t in Areas.templates(Config, def("Mythic")) do
+		if Areas.index(Config, t.rarity) :: number > 6 then
+			mythicAbove += 1
+		end
+	end
+	Test.eq(mythicAbove, 0, "nothing is above Mythic")
 end)
 
 Test.case("free areas are open from the start; paid areas are locked", function()

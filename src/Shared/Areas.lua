@@ -23,8 +23,6 @@ export type Def = {
 	spawnCells: number,
 	activeParts: number,
 	expectedWalk: number,
-	pool: { [string]: number },
-	specialWeight: number?,
 	combat: boolean?,
 	unlockRebirths: number?,
 	pass: string?,
@@ -74,9 +72,34 @@ function Areas.generate(cfg: Settings, def: Def): (any, AreaLayout.Layout)
 	return maze, layout
 end
 
+-- Share of finds per rarity in an area. The area's name is the highest rarity that can spawn there; every lower
+-- rarity can spawn too. The top rarity is TopShare of finds (10%) and the rest is split over the lower rarities,
+-- weighted so tiers just below the top are commoner than tiers far below it (LowerDecay per step down). Example, Mythic:
+-- Mythic 10%, Legendary 27%, Super Rare 21%, Rare 17%, Uncommon 14%, Common 11%. So a Rare part is a smaller share of
+-- the Rare area (10%) than of the Mythic area (17%), and the Common area is all Common. Rarity names are the area
+-- names (a part from a Mythic species is rolled as Mythic).
+function Areas.rarityShares(cfg: Settings, def: Def): { [string]: number }
+	local n = Areas.index(cfg, def.name) :: number
+	if n == 1 then
+		return { [def.name] = 1 }
+	end
+	local weights: { number } = {}
+	local sum = 0.0
+	for below = 1, n - 1 do
+		local w = cfg.Parts.LowerDecay ^ (below - 1)
+		weights[below] = w
+		sum += w
+	end
+	local shares: { [string]: number } = { [def.name] = cfg.Parts.TopShare }
+	for below = 1, n - 1 do
+		shares[cfg.Areas[n - below].name] = (1 - cfg.Parts.TopShare) * weights[below] / sum
+	end
+	return shares
+end
+
 -- Weighted part templates for PartSpawner.
 function Areas.templates(cfg: Settings, def: Def): { Parts.Template }
-	return Parts.templates(def.pool, def.specialWeight or cfg.Parts.SpecialWeight)
+	return Parts.templates(Areas.rarityShares(cfg, def), cfg.Parts.SpecialDrift)
 end
 
 export type Data = { rebirths: number, passes: { [string]: boolean }, areas: { [string]: boolean } }

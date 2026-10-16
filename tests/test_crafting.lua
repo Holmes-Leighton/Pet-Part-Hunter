@@ -39,9 +39,17 @@ end)
 Test.case("spawn templates cover the area's parts, Special at half weight", function()
 	local t = Parts.templates({ Common = 1 })
 	Test.eq(#t, 40, "8 species x 5 slots")
+	local total, plain, special = 0.0, 0.0, 0.0
 	for _, x in t do
-		Test.eq(x.weight, if x.slot == "Special" then 0.5 else 1)
+		total += x.weight :: number
+		if x.slot == "Special" then
+			special = x.weight :: number
+		else
+			plain = x.weight :: number
+		end
 	end
+	Test.near(total, 1, 1e-9, "weights add up to 1")
+	Test.near(special, plain / 2, 1e-9)
 	Test.eq(#Parts.templates({ Nowhere = 1 }), 0)
 end)
 

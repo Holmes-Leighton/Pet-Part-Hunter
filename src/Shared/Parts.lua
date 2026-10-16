@@ -65,20 +65,29 @@ function Parts.count(): number
 	return #all
 end
 
--- Spawn templates for an area, in the shape PartSpawner expects. `pool` maps a part-table area to a weight, so an
--- Uncommon area can mix in some Common parts. Special parts spawn at half rate (spec section 4), and Special parts
--- from areas outside the pool can show up at `specialWeight` each (spec: special slots can spawn in any area).
-function Parts.templates(pool: { [string]: number }, specialWeight: number?): { Template }
+-- Spawn templates for an area, in the shape PartSpawner expects. `shares` maps a rarity to its share of finds (they
+-- should add up to 1). Within a rarity every part is equally likely, with Special parts at half rate (spec section 4).
+-- `drift` is the share of finds taken by Special parts of rarities not in `shares` (spec: special slots can spawn in
+-- any area, at low rates); the rest keeps its relative proportions.
+function Parts.templates(shares: { [string]: number }, drift: number?): { Template }
+	local baseSum: { [string]: number } = {}
+	local drifting = 0
+	for _, def in all do
+		if shares[def.area] then
+			baseSum[def.area] = (baseSum[def.area] or 0) + (if def.slot == "Special" then 0.5 else 1)
+		elseif def.slot == "Special" then
+			drifting += 1
+		end
+	end
+	local driftTotal = if drifting > 0 then drift or 0 else 0
 	local out = {}
 	for _, def in all do
-		local w = pool[def.area]
-		if w then
-			if def.slot == "Special" then
-				w *= 0.5
-			end
-			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = w })
-		elseif def.slot == "Special" and (specialWeight or 0) > 0 then
-			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = specialWeight })
+		local share = shares[def.area]
+		if share then
+			local base = if def.slot == "Special" then 0.5 else 1
+			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = share * (1 - driftTotal) * base / baseSum[def.area] })
+		elseif def.slot == "Special" and driftTotal > 0 then
+			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = driftTotal / drifting })
 		end
 	end
 	return out
