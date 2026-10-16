@@ -1,0 +1,103 @@
+so looking at creating a new roblox game and I need a detailed specification to work from.
+
+the game is where a user can build their own house or do up a basic house with items. allowing them to add move or delete items. there would be running pads in which the user can stand on to upgrade their running speed this will have multiple levels with a rebirth function. see the Keyboard escape game. this is the functionality im after
+
+then their would be multiple areas starting from common,uncommon,rare,super rare,legendary and mythic. when you enter these areas you have a bag that allows you to pick up 3 items to start. in the areas are parts of pets. you need to collect the parts to.build your pet. now to.build the pet you can add any part from any pet as long as that part is needed. i.e could have a head of a chicken and legs of a tiger etc.
+
+when collecting the parts you are chased by a mythic creature. if it catches you, you drop all the parts you find in your bad. those parts are only your if you escape the area with them in your bag.
+
+the better the area the faster the mythical creature hence this is where your speed comes in.
+
+the user should need to pay to open the super rare and above areas.
+
+that's the starting premise of the game. thoughts? questions?
+
+The core loop is strong: risk, reward and a “dash to the exit” tension, with speed upgrades feeding directly into it. It’s a good blend of the Keyboard Escape progression and a collect-and-escape game.
+
+Thoughts
+
+Pets need a purpose. Right now they’re the goal but not the payoff. Having them boost speed, bag size or income would loop them back into progression.
+The house needs a reason to exist. If it’s purely cosmetic, it’ll feel disconnected unless pets live there or it offers buffs or showcase value.
+Paid areas are fine, but keep a free route. Gamepass-only access works, but players tend to accept it better if non-payers can unlock the same areas later through rebirths.
+Mix-and-match parts is your hook. It needs standardised attachment points on every part (head, body, legs, tail and so on) so any combination looks right. I’d settle that early.
+A 3-item bag is tight. That’s good for tension, but it needs bag upgrades (a strong monetisation and progression lever) or runs will feel too slow.
+
+Questions
+
+What does a finished pet actually do (stats, income, cosmetic)?
+Is there a currency, and where does it come from? Selling spare parts, completing runs?
+Are parts consumed when you build a pet, and what happens to duplicates?
+When the chaser catches you, do you just drop the parts, or are you also sent back to the start?
+Are there safe zones or an exit portal in each area, or do you run back to a fixed point?
+Do areas run as shared servers (other players visible) or private instances?
+What resets on rebirth, and what do you keep (pets, house, speed multiplier)?
+Is it a solo build, and are you aiming at mobile players heavily?
+
+Once you’ve answered these, I can write the full spec as a document covering systems, data structures, pet slot rules, chase AI, monetisation and a build order.
+
+answers. 
+
+i think each part of a pet should have stats
+think we should allow trade. not sure on currency not thought of any idea for that. how do other games like this use currency?
+duplicates are fine. the whole point is to hunt the parts you want. if you build a pet those parts are consumed
+if caught you are sent back to the start. maybe should be maze like so hard to get back to the same spot?
+should be points that allow you to teleport out
+shared servers so competing for the same parts etc
+rebirth when leveling starts you speed gain from a higher level. see keyboard escape
+not thought about audience
+
+Comparing currency systems across similar games for context.
+
+How similar games handle currency: most use two tiers.
+
+Soft currency (coins): earned by selling things you collect, spent on progression like bag size, house items, speed upgrades and pet building fees.
+Premium (Robux): pays for gamepasses (area access, 2x speed, extra bag slots) and sometimes skips or boosts.
+
+Here, selling spare parts for coins fits well, and since duplicates are expected, it gives them a use. Rebirth is a third, non-spendable layer that just multiplies your speed.
+
+Your answers
+
+Part stats: a pet’s stats become the sum of its parts. I’d keep it to 3-4 stats, such as speed, bag capacity, coin bonus and luck, so pets feed back into the loop.
+Trading: great for engagement, but it’s the biggest exploit risk. Gate it behind a minimum level or account age and log every trade server-side. It also needs rules so players can’t buy past your paid areas.
+Maze return: a maze makes the chase tense, but a long walk back after every catch will frustrate players. A short “respawn at the entrance” with a rebuild-the-route feel works better than a long trek.
+Teleport-out points: good, they work as extraction points. Spacing them out is your main difficulty lever.
+Shared servers: to avoid griefing, I’d have each player get their own chaser but share the part spawns, so you still compete for parts without being blocked by the creature.
+Audience: Roblox skews heavily towards mobile, so I’d assume it and keep controls and UI simple.
+
+Still to decide
+
+Do part spawns respawn on a timer, and are parts visible to everyone?
+How many parts make a full pet?
+Does the chaser teleport you back or just stun you?
+
+If you’re happy with my suggestions above, I’ll write the full spec as a document.
+
+Weighing a pay-to-win concern in club design request.
+
+Five coin clubs and two paid ones works for the count. The longer reach on the paid ones is the part I’d push back on, because it’s real pay-to-win. Every hit steals a bag item, and the whole game is about keeping your items, so a reach advantage lets paying players take from others more easily. In a PvP setup that’s the kind of thing that makes free players quit or complain.
+
+Options, from safest to closest to what you asked
+
+Same reach, better looks (my pick): the two paid clubs have the same stats as your top coin club. They get a unique skin, swing effect and hit sound instead.
+Sidegrade: the paid clubs reach slightly further but swing slower or have a longer cooldown. Reach isn’t strictly better, so it’s a choice rather than a free upgrade.
+Longer reach as you described: this works if the gap is small and a top coin club comes close. Players can then catch up by playing, and the paid ones remain a convenience.
+
+I’d go with option 1 or 2. If you choose option 3, I’d keep the paid reach to about 10% above the best coin club and track hit rates by club type in monitoring, so we can spot it if paying players dominate.
+
+Which option do you want? Once you choose, I’ll update the Weapons block to 5 coin clubs plus 2 paid and close the open question.
+
+ok go with 1 and maybe a 5% better reach, got to entice them to pay for it
+
+Designing a tiered club membership structure with added perks.
+Pet Part Hunter – Game Design Specification
+Claude Docs·Only you 
+
+Done. The Weapons block now has 5 coin clubs and 2 paid clubs.
+
+Paid clubs: each has the stats of the best coin club with 5% longer reach, plus its own skin, swing effect and hit sound. They can’t be traded.
+Monitoring: hit rates are now tracked per club type. If paying players start dominating, we can see it and cut the 5% edge.
+Open question: it now asks what reach and swing speed ranges the 5 coin clubs should cover, since the paid reach is defined relative to the best one.
+
+I’d keep the 5% small. Anything much bigger starts to read as paying to win, and in this game a hit steals a player’s item.
+
+Do you want me to run a consistency pass over the whole spec now? A lot has changed since I wrote it, and I want to check that the sections still agree with each other
