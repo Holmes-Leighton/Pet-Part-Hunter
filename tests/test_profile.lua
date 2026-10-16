@@ -4,6 +4,9 @@ local Speed = require("../src/Shared/Speed")
 local Profile = require("../src/Shared/Profile")
 local RateLimiter = require("../src/Shared/RateLimiter")
 local Config = require("../src/Shared/Config")
+local Crafting = require("../src/Shared/Crafting")
+local Parts = require("../src/Shared/Parts")
+local Rng = require("../src/Shared/Rng")
 
 local S = Config.Speed
 
@@ -30,7 +33,11 @@ end)
 Test.case("good saves round-trip", function()
 	local d = fresh()
 	d.coins, d.speed, d.rebirths, d.padTier = 123, 500, 1, 3
-	d.parts = { { id = "Chicken_Head" } }
+	Crafting.addPart(Config, d, Parts.get("Chicken_Head") :: Parts.Def, Rng.new(1), 100)
+	Crafting.addPart(Config, d, Parts.get("Tiger_Legs") :: Parts.Def, Rng.new(2), 100)
+	local pet = Crafting.buildPet(Config, d, { Head = d.parts[1].uid })
+	Test.truthy(pet, "built a pet")
+	Test.truthy(Crafting.equip(d, (pet :: Crafting.Pet).uid))
 	Test.eq(Profile.load(d, Config), d)
 end)
 
@@ -62,8 +69,8 @@ end)
 Test.case("rebirth resets Speed, keeps coins/pets/parts/pads, and needs the level", function()
 	local d = fresh()
 	d.coins, d.padTier = 77, 3
-	d.parts = { { id = "p" } }
-	d.pets = { { id = "pet" } }
+	Crafting.addPart(Config, d, Parts.get("Fox_Tail") :: Parts.Def, Rng.new(3), 1)
+	d.pets = { { uid = 99, slots = { Tail = d.parts[1] } } }
 	d.speed = Speed.totalForLevel(S, 14)
 	Test.truthy(not Profile.rebirth(S, d), "level 14 is not enough")
 	Test.eq(d.rebirths, 0)

@@ -10,6 +10,7 @@ local RunService = game:GetService("RunService")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
+local Crafting = require(Shared:WaitForChild("Crafting"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local Speed = require(Shared:WaitForChild("Speed"))
@@ -24,6 +25,11 @@ local PUBLISH_INTERVAL = 0.2 -- seconds between HUD attribute updates per player
 export type Pad = { tier: number, x: number, z: number, radius: number }
 
 -- Sets the attributes the HUD reads. Only values that changed cause a replication.
+-- Equipped pets add their speed bonus (a percentage) to every Speed gain.
+local function petMultiplier(data: Profile.Data): number
+	return 1 + Crafting.equippedStats(Config, data).speed / 100
+end
+
 local function publish(player: Player, data: Profile.Data)
 	local S = Config.Speed
 	local level = Profile.level(S, data)
@@ -39,7 +45,7 @@ local function publish(player: Player, data: Profile.Data)
 	player:SetAttribute("Rebirths", data.rebirths)
 	player:SetAttribute("CanRebirth", Speed.canRebirth(S, data.speed, data.rebirths))
 	player:SetAttribute("NextRebirthMult", Speed.rebirthMultiplier(S, math.min(data.rebirths + 1, S.MaxRebirths)))
-	player:SetAttribute("GainMult", Profile.gainMultiplier(S, data))
+	player:SetAttribute("GainMult", Profile.gainMultiplier(S, data, petMultiplier(data)))
 	player:SetAttribute("PadTier", data.padTier)
 	player:SetAttribute("Coins", data.coins)
 	local stats = player:FindFirstChild("leaderstats")
@@ -150,7 +156,7 @@ function Progression.start(pads: { Pad }, inRun: (Player) -> boolean, notify: Re
 					if dx * dx + dz * dz <= pad.radius * pad.radius and p.Y < 8 then
 						local rate = Profile.padRate(Config.Pads, data, pad.tier)
 						if rate then
-							changed = Profile.addSpeed(Config.Speed, data, rate * dt) > 0
+							changed = Profile.addSpeed(Config.Speed, data, rate * dt, petMultiplier(data)) > 0
 						end
 						break
 					end

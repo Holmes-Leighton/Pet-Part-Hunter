@@ -33,10 +33,39 @@ local Config = {
 		{ tier = 6, rate = 500, coins = 250000, rebirths = 2 },
 	},
 
+	-- Part stat points rolled per rarity (spec section 5). Each part rolls one quality value in [min, max], which the
+	-- slot's stat weights (Shared/Parts) turn into speed / bag / coin / luck. Starting values to tune.
+	Rarity = {
+		Common = { min = 1, max = 3 },
+		Uncommon = { min = 3, max = 6 },
+		Rare = { min = 6, max = 10 },
+		SuperRare = { min = 10, max = 16 },
+		Legendary = { min = 16, max = 25 },
+		Mythic = { min = 25, max = 40 },
+	},
+
+	-- Quality tiers from merging (spec section 5): working names, each raises a part's stats by a set percentage.
+	Tiers = {
+		{ name = "Standard", multiplier = 1 },
+		{ name = "Polished", multiplier = 1.25 },
+		{ name = "Brilliant", multiplier = 1.6 },
+	},
+	MergeCount = 5, -- (spec) same part, same tier
+
+	Pets = {
+		BuildFee = 50, -- coins; proposed pet-building sink
+		StartSlots = 2, -- (spec) equipped pets at the start, buyable up to MaxSlots
+		MaxSlots = 6,
+		-- Per-stat caps on a finished pet (spec: stats are summed, then capped to protect balance).
+		-- speed/coin/luck are percentages; bag is extra bag slots.
+		Caps = { speed = 100, coin = 100, luck = 100, bag = 3 },
+	},
+
 	-- Remote rate limits (spec section 9).
 	RateLimit = {
 		Rebirth = { perSecond = 0.5, burst = 2 },
 		BuyPad = { perSecond = 1, burst = 3 },
+		Craft = { perSecond = 2, burst = 5 },
 	},
 
 	Data = {

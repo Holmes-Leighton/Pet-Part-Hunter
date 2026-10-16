@@ -2,6 +2,8 @@
 -- A player's saved data (spec section 10): defaults, versioned loading, sanitising and the speed/rebirth/pad rules
 -- that act on it. Pure tables only, so all of it is tested without Roblox; the server's PlayerData module stores it.
 
+local Crafting = require("./Crafting")
+local Parts = require("./Parts")
 local Speed = require("./Speed")
 
 local Profile = {}
@@ -13,15 +15,18 @@ export type Data = {
 	rebirths: number,
 	padTier: number, -- highest running pad owned
 	passes: { [string]: boolean },
-	parts: { any }, -- part inventory (filled by the part pipeline)
-	pets: { any },
-	equippedPets: { any },
+	parts: { Crafting.Item },
+	pets: { Crafting.Pet },
+	equippedPets: { number }, -- uids of equipped pets
+	index: { [string]: { first: number, best: number } }, -- Part Index: first time found, best tier owned
+	nextUid: number, -- next unique id for parts and pets
+	petSlots: number, -- how many pets can be equipped
 	house: { any },
 }
 
-export type Settings = { Speed: Speed.Settings, Pads: any, Data: any }
+export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any }
 
-function Profile.default(version: number): Data
+function Profile.default(version: number, startSlots: number?): Data
 	return {
 		version = version,
 		coins = 0,
@@ -32,6 +37,9 @@ function Profile.default(version: number): Data
 		parts = {},
 		pets = {},
 		equippedPets = {},
+		index = {},
+		nextUid = 1,
+		petSlots = startSlots or 2,
 		house = {},
 	}
 end
@@ -47,10 +55,23 @@ local function whole(v: any, fallback: number, max: number): number
 	return math.min(math.floor(nonNegative(v, fallback)), max)
 end
 
+local function cleanItem(raw: any, tierCount: number): Crafting.Item?
+	if type(raw) ~= "table" or type(raw.uid) ~= "number" or type(raw.id) ~= "string" or Parts.get(raw.id) == nil then
+		return nil
+	end
+	local stats: any = { speed = 0, bag = 0, coin = 0, luck = 0 }
+	if type(raw.stats) == "table" then
+		for _, name in Parts.StatNames do
+			stats[name] = math.min(nonNegative(raw.stats[name], 0), 1000)
+		end
+	end
+	return { uid = math.floor(raw.uid), id = raw.id, tier = math.clamp(whole(raw.tier, 1, tierCount), 1, tierCount), stats = stats }
+end
+
 -- Loads saved data: missing or damaged fields fall back to defaults instead of erroring, and Speed is clamped to
 -- what the level cap allows. Add `if raw.version < N then ... end` migration steps here when the schema changes.
 function Profile.load(raw: any, cfg: Settings): Data
-	local out = Profile.default(cfg.Data.SchemaVersion)
+	local out = Profile.default(cfg.Data.SchemaVersion, cfg.Pets.StartSlots)
 	if type(raw) ~= "table" then
 		return out
 	end
@@ -65,11 +86,76 @@ function Profile.load(raw: any, cfg: Settings): Data
 			end
 		end
 	end
-	local anyOut: any = out
-	for _, key in { "parts", "pets", "equippedPets", "house" } do
-		if type(raw[key]) == "table" then
-			anyOut[key] = raw[key]
+	local tierCount = #cfg.Tiers
+	local maxUid = 0
+	local seen: { [number]: boolean } = {}
+	local function claimUid(uid: number): boolean
+		if seen[uid] then
+			return false
 		end
+		seen[uid] = true
+		maxUid = math.max(maxUid, uid)
+		return true
+	end
+	if type(raw.parts) == "table" then
+		for _, r in raw.parts do
+			local item = cleanItem(r, tierCount)
+			if item and claimUid(item.uid) then
+				table.insert(out.parts, item)
+			end
+		end
+	end
+	if type(raw.pets) == "table" then
+		for _, r in raw.pets do
+			if type(r) == "table" and type(r.uid) == "number" and type(r.slots) == "table" then
+				local slots: { [string]: Crafting.Item } = {}
+				local count = 0
+				for socket, ri in r.slots do
+					local item = cleanItem(ri, tierCount)
+					local socketSlot = if type(socket) == "string" then Parts.SocketSlot[socket] else nil
+					local def = if item then Parts.get(item.id) else nil
+					if item and socketSlot and def and def.slot == socketSlot and claimUid(item.uid) then
+						slots[socket] = item
+						count += 1
+					end
+				end
+				if count > 0 and claimUid(math.floor(r.uid)) then
+					table.insert(out.pets, { uid = math.floor(r.uid), slots = slots })
+				end
+			end
+		end
+	end
+	out.petSlots = math.clamp(whole(raw.petSlots, cfg.Pets.StartSlots, cfg.Pets.MaxSlots), cfg.Pets.StartSlots, cfg.Pets.MaxSlots)
+	if type(raw.equippedPets) == "table" then
+		for _, uid in raw.equippedPets do
+			local owned = false
+			for _, p in out.pets do
+				owned = owned or p.uid == uid
+			end
+			if owned and #out.equippedPets < out.petSlots and not table.find(out.equippedPets, uid) then
+				table.insert(out.equippedPets, uid)
+			end
+		end
+	end
+	if type(raw.index) == "table" then
+		for id, e in raw.index do
+			if type(id) == "string" and Parts.get(id) and type(e) == "table" then
+				out.index[id] = { first = nonNegative(e.first, 0), best = math.clamp(whole(e.best, 1, tierCount), 1, tierCount) }
+			end
+		end
+	end
+	-- Everything owned is in the Part Index (entries survive selling and merging, so this only ever adds).
+	for _, item in out.parts do
+		local e = out.index[item.id]
+		if e == nil then
+			out.index[item.id] = { first = 0, best = item.tier }
+		elseif item.tier > e.best then
+			e.best = item.tier
+		end
+	end
+	out.nextUid = math.max(whole(raw.nextUid, 1, 2 ^ 52), maxUid + 1)
+	if type(raw.house) == "table" then
+		out.house = raw.house
 	end
 	return out
 end
@@ -82,9 +168,9 @@ function Profile.walkSpeed(cfg: Speed.Settings, data: Data): number
 	return Speed.walkSpeed(cfg, Profile.level(cfg, data))
 end
 
--- Total multiplier on Speed gained: rebirth, times the 2x pass if owned.
-function Profile.gainMultiplier(cfg: Speed.Settings, data: Data): number
-	local mult = Speed.rebirthMultiplier(cfg, data.rebirths)
+-- Total multiplier on Speed gained: rebirth, times the 2x pass if owned, times `extra` (equipped pets: 1 + speed%/100).
+function Profile.gainMultiplier(cfg: Speed.Settings, data: Data, extra: number?): number
+	local mult = Speed.rebirthMultiplier(cfg, data.rebirths) * (extra or 1)
 	if data.passes.DoubleSpeed then
 		mult *= cfg.PassMultiplier
 	end
@@ -92,12 +178,12 @@ function Profile.gainMultiplier(cfg: Speed.Settings, data: Data): number
 end
 
 -- Adds Speed from a base amount (pad rate x seconds), stopping at the level cap. Returns the Speed actually added.
-function Profile.addSpeed(cfg: Speed.Settings, data: Data, base: number): number
+function Profile.addSpeed(cfg: Speed.Settings, data: Data, base: number, extra: number?): number
 	if base <= 0 then
 		return 0
 	end
 	local before = data.speed
-	data.speed = math.min(before + base * Profile.gainMultiplier(cfg, data), Speed.totalCap(cfg, data.rebirths))
+	data.speed = math.min(before + base * Profile.gainMultiplier(cfg, data, extra), Speed.totalCap(cfg, data.rebirths))
 	return data.speed - before
 end
 

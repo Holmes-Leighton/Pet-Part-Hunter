@@ -17,22 +17,20 @@ local Chaser = require(Shared:WaitForChild("Chaser"))
 local EscapeTimer = require(Shared:WaitForChild("EscapeTimer"))
 local PartSpawner = require(Shared:WaitForChild("PartSpawner"))
 local Run = require(Shared:WaitForChild("Run"))
+local Parts = require(Shared:WaitForChild("Parts"))
+local Crafting = require(Shared:WaitForChild("Crafting"))
 
 local AreaBuilder = require(script.Parent:WaitForChild("AreaBuilder"))
 local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
 local Progression = require(script.Parent:WaitForChild("Progression"))
+local CraftService = require(script.Parent:WaitForChild("CraftService"))
+local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 
 local CELL = Config.Maze.CellSize
 local AREA = "Common"
 
--- Placeholder part types for the prototype (real species come with the part pipeline).
-local CATALOG: { PartSpawner.Template } = {
-	{ species = "Chicken", slot = "Head", rarity = "Common" },
-	{ species = "Tiger", slot = "Legs", rarity = "Common" },
-	{ species = "Frog", slot = "Body", rarity = "Common" },
-	{ species = "Fox", slot = "Tail", rarity = "Common" },
-	{ species = "Owl", slot = "Special", rarity = "Common", weight = 0.5 },
-}
+-- Spawn templates come from the part data table (Shared/Parts).
+local CATALOG: { PartSpawner.Template } = Parts.templates(AREA)
 local SPECIES_COLOR: { [string]: Color3 } = {
 	Chicken = Color3.fromRGB(255, 220, 90),
 	Tiger = Color3.fromRGB(255, 140, 40),
@@ -203,6 +201,9 @@ end
 Progression.start(AreaBuilder.buildPads(Config, world:FindFirstChild("Lobby") :: Instance), function(player)
 	return runs[player] ~= nil
 end, notify)
+CraftService.start(function(player)
+	return runs[player] ~= nil
+end, notify)
 
 -- Chaser speed for new runs. In Studio only, the DebugChaserSpeed workspace attribute overrides it so playtests
 -- can freeze the chaser (0) or speed it up without editing code.
@@ -214,14 +215,17 @@ local function chaserSpeed(): number
 	return Config.Player.WalkSpeed * Config.Chase.SpeedMultiplier[AREA]
 end
 
+local rollRng = Rng.new(os.time())
+
 local function startRun(player: Player)
-	if runs[player] then
-		return
+	local data = PlayerData.get(player)
+	if runs[player] or data == nil then
+		return -- data still loading: banked parts need somewhere to go
 	end
 	local ex, ez = cellWorld(layout.entrance)
 	local sx, sz = cellWorld(layout.chaserStart)
 	local run = Run.new({
-		bag = Bag.new(Config.Bag.StartCapacity),
+		bag = Bag.new(Config.Bag.StartCapacity + Crafting.equippedStats(Config, data).bag),
 		chaser = Chaser.new(grid, sx, sz, chaserSpeed()),
 		spawner = spawner,
 		timer = EscapeTimer.new(Config.Escape.HoldSeconds),
@@ -308,7 +312,17 @@ RunService.Heartbeat:Connect(function(dt)
 				notify:FireClient(player, string.format("CAUGHT! You lost %d part(s). Back to the start.", #lost))
 			elseif e.type == "escaped" then
 				local parts = e.parts or {}
-				player:SetAttribute("Banked", (player:GetAttribute("Banked") :: number) + #parts)
+				local data = PlayerData.get(player)
+				if data then
+					for _, part in parts do
+						-- Bag parts are spawn instances (id "part-N"); the catalog id is Species_Slot.
+						local def = Parts.get(part.species .. "_" .. part.slot)
+						if def then
+							Crafting.addPart(Config, data, def, rollRng, os.time())
+						end
+					end
+					CraftService.push(player)
+				end
 				enterCooldown[player] = os.clock() + 3
 				endRun(player)
 				teleport(player, lobby.spawn.X, lobby.spawn.Y, lobby.spawn.Z)
