@@ -199,6 +199,12 @@ function HomeService.push(player: Player)
 	})
 end
 
+-- Rebuilds a player's furniture from their data and resends their home state (used after an admin rollback).
+function HomeService.refresh(player: Player)
+	rebuildFurniture(player)
+	HomeService.push(player)
+end
+
 -- Moving around ---------------------------------------------------------------------------------------------------
 local function rootOf(player: Player): BasePart?
 	local char = player.Character

@@ -32,6 +32,10 @@ local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local EventService = require(script.Parent:WaitForChild("EventService"))
+local AdminService = require(script.Parent:WaitForChild("AdminService"))
+local BanService = require(script.Parent:WaitForChild("BanService"))
+local SnapshotService = require(script.Parent:WaitForChild("SnapshotService"))
+local TuningService = require(script.Parent:WaitForChild("TuningService"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local HomeService = require(script.Parent:WaitForChild("HomeService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
@@ -292,7 +296,7 @@ local function chaserSpeed(def: Areas.Def): number
 	if RunService:IsStudio() and type(override) == "number" then
 		return override
 	end
-	return Areas.chaserSpeed(Config, def) * EventService.mods().chaser
+	return Areas.chaserSpeed(Config, def) * EventService.mods().chaser * TuningService.chaserMult(def.name)
 end
 
 local function entranceWorld(ctx: AreaCtx): (number, number)
@@ -347,6 +351,18 @@ Players.PlayerRemoving:Connect(function(player)
 	endRun(player)
 	enterCooldown[player] = nil
 end)
+
+-- Admin tools (spec section 8): roles, commands, bans, snapshots and live tuning. Settings changed in the panel apply
+-- straight away; the part respawn rate is the one that needs pushing into the spawners.
+TuningService.start()
+TuningService.onChanged(function()
+	for _, ctx in areaCtxs do
+		ctx.spawner.respawnSeconds = Config.Parts.RespawnSeconds * TuningService.respawnMult()
+	end
+end)
+BanService.start()
+SnapshotService.start()
+AdminService.start()
 
 -- Events (spec section 8) -----------------------------------------------------------------------------------------------
 -- Removes an event area: anyone running it goes back to the lobby, then the maze, parts and portal are cleared.
@@ -429,7 +445,11 @@ RunService.Heartbeat:Connect(function(dt)
 					local dx, dz = p.X - portal.x, p.Z - portal.z
 					if dx * dx + dz * dz <= (portal.radius + 1) ^ 2 and p.Y < 8 then
 						local target = areaByName[portal.name]
-						if target and (target.def.event ~= nil or AreaAccess.check(player, portal.name)) then
+						if target and not target.def.event and not TuningService.areaOpen(portal.name) then
+							-- Closed for maintenance from the admin panel.
+							enterCooldown[player] = os.clock() + 3
+							notify:FireClient(player, portal.name .. " is closed for maintenance right now.")
+						elseif target and (target.def.event ~= nil or AreaAccess.check(player, portal.name)) then
 							startRun(player, target)
 						end
 						break
