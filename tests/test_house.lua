@@ -335,4 +335,46 @@ Test.case("world positions: floor items stand on the floor, ceiling items hang f
 	Test.eq(wx, 0, "west wall")
 end)
 
+Test.case("world boxes: right size, inside the room, wall items clear of the wall surface", function()
+	local cell = Config.House.CellSize
+	local W, D = Config.House.Width * cell, Config.House.Depth * cell
+	local cx, cy, cz, sx, sy, sz = House.worldBox(Config, def("Bed"), { x = 0, y = 0, r = 1 })
+	Test.eq({ sx, sy, sz }, { 3 * cell, 3, 2 * cell }, "turned bed is 3 wide and 2 deep")
+	Test.eq({ cx, cz }, { 1.5 * cell, 1 * cell })
+	Test.eq(cy, 1.5)
+	-- A north wall painting: slab pushed into the room (+z), 2 cells wide, 2 rows tall.
+	local px, py, pz, psx, psy, psz = House.worldBox(Config, def("Painting"), { x = 2, y = 1, r = 0 })
+	Test.eq({ px, py, psx, psy, psz }, { 3 * cell, 2 * cell, 2 * cell, 2 * cell, Config.House.WallItemDepth })
+	Test.truthy(pz - psz / 2 >= Config.House.WallThickness / 2, "does not poke into the wall")
+	-- East wall: pushed to -x, thin in x, long in z.
+	local ex, _, _, esx, _, esz = House.worldBox(Config, def("Painting"), { x = 2, y = 1, r = 1 })
+	Test.eq({ esx, esz }, { Config.House.WallItemDepth, 2 * cell })
+	Test.truthy(ex + esx / 2 <= W - Config.House.WallThickness / 2)
+	-- Every valid placement of every item stays inside the room's outer box.
+	for _, f in Config.Furniture do
+		for r = 0, 3 do
+			for x = 0, 15 do
+				for y = 0, 15 do
+					if House.canPlace(Config, {}, f, x, y, r, nil, nil) then
+						local bx, by, bz, bsx, bsy, bsz = House.worldBox(Config, f, { x = x, y = y, r = r })
+						Test.truthy(bx - bsx / 2 >= -0.01 and bx + bsx / 2 <= W + 0.01, f.id .. " x inside")
+						Test.truthy(bz - bsz / 2 >= -0.01 and bz + bsz / 2 <= D + 0.01, f.id .. " z inside")
+						Test.truthy(by - bsy / 2 >= -0.01 and by + bsy / 2 <= Config.House.WallRows * cell + 0.01, f.id .. " y inside")
+					end
+				end
+			end
+		end
+	end
+end)
+
+Test.case("facing steps are unit steps that turn through all four directions", function()
+	local seen: { [string]: boolean } = {}
+	for r = 0, 3 do
+		local x, z = House.facing(r)
+		Test.eq(math.abs(x) + math.abs(z), 1)
+		seen[x .. "," .. z] = true
+	end
+	Test.eq(seen["0,1"] and seen["-1,0"] and seen["0,-1"] and seen["1,0"], true)
+end)
+
 Test.done()

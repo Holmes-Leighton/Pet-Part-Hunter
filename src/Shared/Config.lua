@@ -77,6 +77,8 @@ local Config = {
 		PlotSpacing = 60,
 		PlotsPerRow = 8,
 		Variants = 4, -- colour variants per item (0 = the default colour)
+		WallThickness = 1, -- studs
+		WallItemDepth = 0.5, -- studs a wall item sticks out
 		SchemaVersion = 1,
 	},
 

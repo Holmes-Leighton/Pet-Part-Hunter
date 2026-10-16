@@ -315,4 +315,42 @@ function House.worldCentre(cfg: Settings, def: any, item: { x: number, y: number
 	return 0, height, along
 end
 
+-- Where a wall item's slab sits: pushed off its wall into the room (half the wall plus half the slab), so it never
+-- fights the wall surface. Returns the offset in X and Z for each wall side.
+local function inward(cfg: Settings, side: number): (number, number)
+	local off = (cfg.House.WallThickness + cfg.House.WallItemDepth) / 2
+	if side == 0 then
+		return 0, off
+	elseif side == 1 then
+		return -off, 0
+	elseif side == 2 then
+		return 0, -off
+	end
+	return off, 0
+end
+
+-- The box an item occupies in the world, relative to the plot corner: centre (cx, cy, cz) and size (sx, sy, sz) in
+-- studs. Server and client both build furniture and the placement ghost from this, so they always agree.
+function House.worldBox(cfg: Settings, def: any, item: { x: number, y: number, r: number }): (number, number, number, number, number, number)
+	local cell = cfg.House.CellSize
+	local cx, cy, cz = House.worldCentre(cfg, def, item)
+	if def.surface == "wall" then
+		local ix, iz = inward(cfg, item.r)
+		local thick = cfg.House.WallItemDepth
+		if item.r % 2 == 0 then
+			return cx + ix, cy, cz + iz, def.w * cell, def.d * cell, thick
+		end
+		return cx + ix, cy, cz + iz, thick, def.d * cell, def.w * cell
+	end
+	local w, d = House.dims(def, item.r)
+	return cx, cy, cz, w * cell, def.h, d * cell
+end
+
+-- Which way a floor or ceiling item faces for a quarter turn r, as a unit step in X and Z (r = 0 faces south, +Z).
+function House.facing(r: number): (number, number)
+	local dirs = { { 0, 1 }, { -1, 0 }, { 0, -1 }, { 1, 0 } }
+	local d = dirs[(r % 4) + 1]
+	return d[1], d[2]
+end
+
 return House

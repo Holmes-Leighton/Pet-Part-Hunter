@@ -28,6 +28,7 @@ local AreaAccess = require(script.Parent:WaitForChild("AreaAccess"))
 local AreaBuilder = require(script.Parent:WaitForChild("AreaBuilder"))
 local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
+local HomeService = require(script.Parent:WaitForChild("HomeService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Progression = require(script.Parent:WaitForChild("Progression"))
 
@@ -251,6 +252,9 @@ CraftService.start(function(player)
 	return runs[player] ~= nil
 end, notify)
 AreaAccess.start(notify)
+HomeService.start(function(player)
+	return runs[player] ~= nil
+end, notify, lobby.spawn)
 
 -- Chaser speed for new runs: the area's expected player speed times its tier multiplier (Shared/Areas). In Studio
 -- only, the DebugChaserSpeed workspace attribute overrides it so playtests can freeze the chaser (0) or speed it up.
