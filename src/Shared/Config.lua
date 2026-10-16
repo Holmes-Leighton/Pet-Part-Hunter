@@ -35,14 +35,14 @@ local Config = {
 
 	-- Part stat points rolled per rarity (spec section 5). Each part rolls one quality value in [min, max], which the
 	-- slot's stat weights (Shared/Parts) turn into speed / bag / coin / luck. Starting values to tune.
-	Rarity = {
+	Rarity = ({
 		Common = { min = 1, max = 3 },
 		Uncommon = { min = 3, max = 6 },
 		Rare = { min = 6, max = 10 },
 		SuperRare = { min = 10, max = 16 },
 		Legendary = { min = 16, max = 25 },
 		Mythic = { min = 25, max = 40 },
-	},
+	} :: any),
 
 	-- Quality tiers from merging (spec section 5): working names, each raises a part's stats by a set percentage.
 	Tiers = {
@@ -87,22 +87,39 @@ local Config = {
 		LoopFraction = 0.12, -- share of interior walls knocked out so there are loops to run around (spec)
 	},
 
-	Area = {
-		Seed = 1, -- fixed so the Common maze is the same every server while we tune it
-		Width = 11, -- cells
-		Height = 11,
-		ExitCount = 3,
-		MinExitSeparation = 8, -- maze steps between exits and from the entrance
-		SpawnCells = 30, -- candidate cells for parts
+	-- The six World 1 areas, in rarity order (spec section 4). Teleport-out spacing is the main difficulty lever:
+	-- fewer and further apart in higher areas. Seeds are fixed so every server has the same mazes while we tune.
+	--   expectedWalk: the WalkSpeed a player is expected to have there; the chaser runs at expectedWalk x SpeedMultiplier.
+	--   pool: which parts spawn (part-table area -> weight); specialWeight: chance weight of any other area's Special parts.
+	--   unlockRebirths / pass: the free route (a rebirth count) and the early-access game pass key (Config.Passes).
+	Areas = ({
+		{ name = "Common", seed = 1, width = 11, height = 11, exitCount = 3, minExitSeparation = 8, spawnCells = 30, activeParts = 5, expectedWalk = 12, pool = { Common = 1 } },
+		{ name = "Uncommon", seed = 2, width = 12, height = 12, exitCount = 3, minExitSeparation = 9, spawnCells = 34, activeParts = 5, expectedWalk = 20, pool = { Uncommon = 1, Common = 0.25 } },
+		{ name = "Rare", seed = 3, width = 13, height = 13, exitCount = 3, minExitSeparation = 10, spawnCells = 38, activeParts = 5, expectedWalk = 30, pool = { Rare = 1, Uncommon = 0.25 }, combat = true },
+		{ name = "SuperRare", seed = 4, width = 14, height = 14, exitCount = 3, minExitSeparation = 11, spawnCells = 42, activeParts = 5, expectedWalk = 40, pool = { SuperRare = 1 }, combat = true, unlockRebirths = 2, pass = "Area_SuperRare" },
+		{ name = "Legendary", seed = 5, width = 15, height = 15, exitCount = 2, minExitSeparation = 12, spawnCells = 46, activeParts = 5, expectedWalk = 50, pool = { Legendary = 1 }, combat = true, unlockRebirths = 4, pass = "Area_Legendary" },
+		{ name = "Mythic", seed = 6, width = 16, height = 16, exitCount = 2, minExitSeparation = 13, spawnCells = 50, activeParts = 5, expectedWalk = 60, pool = { Mythic = 1 }, specialWeight = 0.08, combat = true, unlockRebirths = 6, pass = "Area_Mythic" },
+	} :: any),
+
+	-- Game pass IDs for early access to the paid areas (spec section 7). 0 = not set up yet: set the real Roblox IDs
+	-- here. "AllAreas" is the discounted bundle and unlocks every paid area.
+	Passes = {
+		Area_SuperRare = 0,
+		Area_Legendary = 0,
+		Area_Mythic = 0,
+		AllAreas = 0,
 	},
 
 	Chase = {
 		-- Chaser speed relative to the expected player speed in that area (spec section 4).
-		SpeedMultiplier = {
+		SpeedMultiplier = ({
 			Common = 0.85,
 			Uncommon = 0.95,
 			Rare = 1.05,
-		},
+			SuperRare = 1.15,
+			Legendary = 1.25,
+			Mythic = 1.35,
+		} :: any),
 		CatchRadius = 3, -- studs between chaser and player centres
 		ProtectionSeconds = 3, -- no catch right after respawning at the entrance (spec)
 		HeadStartSeconds = 2, -- chaser waits this long at the start of a run
@@ -117,7 +134,7 @@ local Config = {
 	Parts = {
 		PickupRadius = 5,
 		RespawnSeconds = 20,
-		ActiveCount = 5, -- prototype: five placeholder parts
+		SpecialWeight = 0.02, -- spawn weight of each Special part from another area (spec: any area, low rates)
 	},
 }
 

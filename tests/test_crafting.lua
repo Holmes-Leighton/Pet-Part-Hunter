@@ -24,7 +24,7 @@ local function give(d: Profile.Data, id: string, n: number, seed: number?): { Cr
 end
 
 Test.case("the catalog has every slot for every species, with unique spec-style ids", function()
-	Test.eq(Parts.count(), 25)
+	Test.eq(Parts.count(), 240, "48 species x 5 slots")
 	Test.truthy(Parts.get("Chicken_Head") ~= nil and Parts.get("Owl_Special") ~= nil)
 	Test.eq(Parts.get("Chicken_Wings"), nil)
 	local seen: { [string]: boolean } = {}
@@ -37,12 +37,12 @@ Test.case("the catalog has every slot for every species, with unique spec-style 
 end)
 
 Test.case("spawn templates cover the area's parts, Special at half weight", function()
-	local t = Parts.templates("Common")
-	Test.eq(#t, 25)
+	local t = Parts.templates({ Common = 1 })
+	Test.eq(#t, 40, "8 species x 5 slots")
 	for _, x in t do
-		Test.eq(x.weight, if x.slot == "Special" then 0.5 else nil)
+		Test.eq(x.weight, if x.slot == "Special" then 0.5 else 1)
 	end
-	Test.eq(#Parts.templates("Nowhere"), 0)
+	Test.eq(#Parts.templates({ Nowhere = 1 }), 0)
 end)
 
 Test.case("rolled stats stay inside the rarity range and follow the slot's roles", function()
@@ -71,7 +71,7 @@ Test.case("addPart gives unique uids and fills the Part Index", function()
 	local b = give(d, "Chicken_Head", 1)[1]
 	Test.truthy(a.uid ~= b.uid)
 	Test.eq(d.index.Chicken_Head, { first = 1000, best = 1 })
-	Test.eq({ Crafting.indexProgress(d) }, { 1, 25 })
+	Test.eq({ Crafting.indexProgress(d) }, { 1, Parts.count() })
 end)
 
 Test.case("merge: five of the same part and tier become one of the next tier, averaging stats", function()

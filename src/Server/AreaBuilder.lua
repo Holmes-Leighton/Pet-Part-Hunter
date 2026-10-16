@@ -25,7 +25,7 @@ end
 
 local function label(parent: Part, text: string, color: Color3)
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(120, 36)
+	gui.Size = UDim2.fromOffset(150, 54)
 	gui.StudsOffset = Vector3.new(0, 6, 0)
 	gui.AlwaysOnTop = true
 	gui.Parent = parent
@@ -50,10 +50,10 @@ local function pad(name: string, cx: number, cz: number, radius: number, color: 
 end
 
 -- Builds the maze area under `parent`. Returns the Model plus the wall count for validation.
-function AreaBuilder.build(Maze: any, maze: any, layout: any, cfg: any, parent: Instance): Model
+function AreaBuilder.build(Maze: any, maze: any, layout: any, cfg: any, parent: Instance, name: string): Model
 	local C, H, T = cfg.Maze.CellSize, cfg.Maze.WallHeight, cfg.Maze.WallThickness
 	local model = Instance.new("Model")
-	model.Name = "Area_Common"
+	model.Name = "Area_" .. name
 	model.Parent = parent
 
 	local walls = Instance.new("Folder")
@@ -98,8 +98,19 @@ function AreaBuilder.build(Maze: any, maze: any, layout: any, cfg: any, parent: 
 	return model
 end
 
--- Lobby: a platform beside the maze with a pad to step on to enter, and the spawn point.
-function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, enterPad: Vector3 }
+-- Lobby: a platform beside the mazes with one portal pad per area (stepping on it asks to enter), and the spawn point.
+local AREA_COLORS: { [string]: Color3 } = {
+	Common = Color3.fromRGB(235, 235, 235),
+	Uncommon = Color3.fromRGB(110, 220, 110),
+	Rare = Color3.fromRGB(90, 170, 255),
+	SuperRare = Color3.fromRGB(190, 110, 255),
+	Legendary = Color3.fromRGB(255, 170, 50),
+	Mythic = Color3.fromRGB(255, 70, 110),
+}
+
+export type Portal = { name: string, x: number, z: number, radius: number }
+
+function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, portals: { Portal } }
 	local model = Instance.new("Model")
 	model.Name = "Lobby"
 	model.Parent = parent
@@ -116,10 +127,18 @@ function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, e
 	spawn.Color = Color3.fromRGB(240, 240, 240)
 	spawn.Parent = model
 
-	local enterAt = centre + Vector3.new(0, 0, -12)
-	local enterPad = pad("EnterCommon", enterAt.X, enterAt.Z, 6, Color3.fromRGB(255, 190, 60), model)
-	label(enterPad, "ENTER COMMON AREA", Color3.fromRGB(255, 220, 120))
-	return { spawn = spawn.Position + Vector3.new(0, 3, 0), enterPad = enterAt }
+	local portals: { Portal } = {}
+	for i, def in cfg.Areas do
+		local x, z = -75 + (i - 1) * 10, 64
+		local color = AREA_COLORS[def.name] or Color3.new(1, 1, 1)
+		local p = pad("Enter" .. def.name, x, z, 4, color, model)
+		local locked = def.unlockRebirths ~= nil or def.pass ~= nil
+		label(p, string.upper(def.name) .. (if def.unlockRebirths then "\nRebirth " .. def.unlockRebirths .. " / pass" else ""), color)
+		p:SetAttribute("Area", def.name)
+		p:SetAttribute("Locked", locked)
+		table.insert(portals, { name = def.name, x = x, z = z, radius = 4 })
+	end
+	return { spawn = spawn.Position + Vector3.new(0, 3, 0), portals = portals }
 end
 
 -- Running pads in the lobby: one per tier in a row. Standing on one trains Speed (the server does the counting).

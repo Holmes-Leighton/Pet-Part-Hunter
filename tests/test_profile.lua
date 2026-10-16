@@ -15,8 +15,10 @@ local function fresh(): Profile.Data
 end
 
 Test.case("a missing or non-table save loads the defaults", function()
-	Test.eq(fresh(), Profile.default(Config.Data.SchemaVersion))
-	Test.eq(Profile.load("garbage", Config), Profile.default(Config.Data.SchemaVersion))
+	local expected = Profile.default(Config.Data.SchemaVersion)
+	expected.areas = { Common = true, Uncommon = true, Rare = true } -- the free areas are always open
+	Test.eq(fresh(), expected)
+	Test.eq(Profile.load("garbage", Config), expected)
 end)
 
 Test.case("bad fields are repaired and speed is clamped to the level cap", function()

@@ -17,6 +17,7 @@ local Speed = require(Shared:WaitForChild("Speed"))
 
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local AreaAccess = require(script.Parent:WaitForChild("AreaAccess"))
 
 local Progression = {}
 
@@ -110,6 +111,7 @@ function Progression.start(pads: { Pad }, inRun: (Player) -> boolean, notify: Re
 			local before = data.rebirths
 			if Profile.rebirth(Config.Speed, data) then
 				Analytics.log(player, "Rebirth", data.rebirths)
+				AreaAccess.refresh(player) -- the free route to the paid areas is a rebirth count
 				notify:FireClient(player, string.format("REBIRTH %d! Speed gain is now x%.2f", data.rebirths, Speed.rebirthMultiplier(Config.Speed, data.rebirths)))
 			else
 				notify:FireClient(player, string.format("Reach level %d to rebirth (rebirths: %d)", Speed.levelCap(Config.Speed, before), before))

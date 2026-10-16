@@ -2,6 +2,7 @@
 -- A player's saved data (spec section 10): defaults, versioned loading, sanitising and the speed/rebirth/pad rules
 -- that act on it. Pure tables only, so all of it is tested without Roblox; the server's PlayerData module stores it.
 
+local Areas = require("./Areas")
 local Crafting = require("./Crafting")
 local Parts = require("./Parts")
 local Speed = require("./Speed")
@@ -15,6 +16,7 @@ export type Data = {
 	rebirths: number,
 	padTier: number, -- highest running pad owned
 	passes: { [string]: boolean },
+	areas: { [string]: boolean }, -- permanently unlocked areas
 	parts: { Crafting.Item },
 	pets: { Crafting.Pet },
 	equippedPets: { number }, -- uids of equipped pets
@@ -24,7 +26,7 @@ export type Data = {
 	house: { any },
 }
 
-export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any }
+export type Settings = { Speed: Speed.Settings, Pads: any, Data: any, Tiers: any, Pets: any, Areas: any, Passes: any, Chase: any, Maze: any, Parts: any }
 
 function Profile.default(version: number, startSlots: number?): Data
 	return {
@@ -34,6 +36,7 @@ function Profile.default(version: number, startSlots: number?): Data
 		rebirths = 0,
 		padTier = 1,
 		passes = {},
+		areas = {},
 		parts = {},
 		pets = {},
 		equippedPets = {},
@@ -73,6 +76,7 @@ end
 function Profile.load(raw: any, cfg: Settings): Data
 	local out = Profile.default(cfg.Data.SchemaVersion, cfg.Pets.StartSlots)
 	if type(raw) ~= "table" then
+		Areas.refreshUnlocks(cfg, out)
 		return out
 	end
 	out.coins = whole(raw.coins, 0, 2 ^ 53)
@@ -125,6 +129,14 @@ function Profile.load(raw: any, cfg: Settings): Data
 			end
 		end
 	end
+	if type(raw.areas) == "table" then
+		for _, def in cfg.Areas do
+			if raw.areas[def.name] == true then
+				out.areas[def.name] = true
+			end
+		end
+	end
+	Areas.refreshUnlocks(cfg, out) -- free areas, plus anything the saved rebirths or passes already earn
 	out.petSlots = math.clamp(whole(raw.petSlots, cfg.Pets.StartSlots, cfg.Pets.MaxSlots), cfg.Pets.StartSlots, cfg.Pets.MaxSlots)
 	if type(raw.equippedPets) == "table" then
 		for _, uid in raw.equippedPets do

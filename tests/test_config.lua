@@ -21,7 +21,9 @@ Test.case("the player can fit through a corridor, and pads fit the corridor widt
 end)
 
 Test.case("there are enough spawn cells for the active part count", function()
-	Test.truthy(Config.Area.SpawnCells >= Config.Parts.ActiveCount * 2)
+	for _, def in Config.Areas do
+		Test.truthy(def.spawnCells >= def.activeParts * 2, def.name)
+	end
 end)
 
 Test.case("the catch radius is smaller than the interrupt distance", function()

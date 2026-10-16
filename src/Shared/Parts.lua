@@ -6,6 +6,7 @@
 local Parts = {}
 
 export type Def = { id: string, species: string, slot: string, rarity: string, area: string, world: number }
+export type Template = { species: string, slot: string, rarity: string, weight: number? }
 export type Stats = { speed: number, bag: number, coin: number, luck: number }
 
 Parts.Slots = { "Head", "Body", "Legs", "Tail", "Special" } -- part slot types
@@ -25,14 +26,22 @@ Parts.StatWeights = ({
 	Special = { speed = 0.2, coin = 0.2, luck = 0.2 },
 } :: any) :: { [string]: { [string]: number } }
 
--- Species per area. Prototype species for the Common area; the other areas fill in with the content waves.
-local SPECIES: { { name: string, rarity: string, area: string } } = {
-	{ name = "Chicken", rarity = "Common", area = "Common" },
-	{ name = "Tiger", rarity = "Common", area = "Common" },
-	{ name = "Frog", rarity = "Common", area = "Common" },
-	{ name = "Fox", rarity = "Common", area = "Common" },
-	{ name = "Owl", rarity = "Common", area = "Common" },
+-- Eight species per area (spec section 4), 48 in World 1. Names are placeholders until the art lands; Common keeps
+-- the five prototype species so existing saves stay valid.
+local SPECIES_BY_AREA: { { area: string, names: { string } } } = {
+	{ area = "Common", names = { "Chicken", "Tiger", "Frog", "Fox", "Owl", "Duck", "Rabbit", "Pig" } },
+	{ area = "Uncommon", names = { "Goat", "Raccoon", "Hedgehog", "Deer", "Turtle", "Penguin", "Otter", "Monkey" } },
+	{ area = "Rare", names = { "Wolf", "Bear", "Panda", "Lynx", "Eagle", "Crocodile", "Moose", "Octopus" } },
+	{ area = "SuperRare", names = { "Lion", "Shark", "Rhino", "Gorilla", "Cheetah", "SnowLeopard", "Orca", "Hippo" } },
+	{ area = "Legendary", names = { "Sabertooth", "Mammoth", "Direwolf", "Thunderbird", "Cerberus", "Kitsune", "Yeti", "Behemoth" } },
+	{ area = "Mythic", names = { "Kraken", "Leviathan", "Chimera", "Hydra", "Fenrir", "Cyclops", "Sphinx", "Nemean" } },
 }
+local SPECIES: { { name: string, rarity: string, area: string } } = {}
+for _, group in SPECIES_BY_AREA do
+	for _, name in group.names do
+		table.insert(SPECIES, { name = name, rarity = group.area, area = group.area })
+	end
+end
 
 local all: { Def } = {}
 local byId: { [string]: Def } = {}
@@ -56,12 +65,20 @@ function Parts.count(): number
 	return #all
 end
 
--- Spawn templates for an area, in the shape PartSpawner expects. Special parts spawn at half rate (spec section 4).
-function Parts.templates(area: string): { { species: string, slot: string, rarity: string, weight: number? } }
+-- Spawn templates for an area, in the shape PartSpawner expects. `pool` maps a part-table area to a weight, so an
+-- Uncommon area can mix in some Common parts. Special parts spawn at half rate (spec section 4), and Special parts
+-- from areas outside the pool can show up at `specialWeight` each (spec: special slots can spawn in any area).
+function Parts.templates(pool: { [string]: number }, specialWeight: number?): { Template }
 	local out = {}
 	for _, def in all do
-		if def.area == area then
-			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = if def.slot == "Special" then 0.5 else nil })
+		local w = pool[def.area]
+		if w then
+			if def.slot == "Special" then
+				w *= 0.5
+			end
+			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = w })
+		elseif def.slot == "Special" and (specialWeight or 0) > 0 then
+			table.insert(out, { species = def.species, slot = def.slot, rarity = def.rarity, weight = specialWeight })
 		end
 	end
 	return out
