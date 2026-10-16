@@ -241,7 +241,7 @@ end
 function Crafting.indexProgress(data: Data): (number, number)
 	local found = 0
 	for id in data.index do
-		if Parts.get(id) then
+		if Parts.get(id) and not Parts.isEvent(id) then -- event parts have their own Index tab and do not change the total
 			found += 1
 		end
 	end

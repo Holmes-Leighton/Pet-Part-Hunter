@@ -87,6 +87,13 @@ function PartSpawner._spawnOne(self: PartSpawner, avoid: number)
 	}
 end
 
+-- Swaps the part templates future spawns draw from (events change the pool while the server runs). Parts already
+-- on the ground are untouched.
+function PartSpawner.setCatalog(self: PartSpawner, catalog: { Template })
+	assert(#catalog >= 1, "need at least one part template")
+	self.catalog = catalog
+end
+
 function PartSpawner.activeSpawns(self: PartSpawner): { Spawn }
 	local out: { Spawn } = {}
 	for _, s in self.active do

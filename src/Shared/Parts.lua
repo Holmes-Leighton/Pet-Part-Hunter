@@ -5,7 +5,7 @@
 
 local Parts = {}
 
-export type Def = { id: string, species: string, slot: string, rarity: string, area: string, world: number }
+export type Def = { id: string, species: string, slot: string, rarity: string, area: string, world: number, event: string?, tradable: boolean? }
 export type Template = { species: string, slot: string, rarity: string, weight: number? }
 export type Stats = { speed: number, bag: number, coin: number, luck: number }
 
@@ -53,8 +53,51 @@ for _, sp in SPECIES do
 	end
 end
 
+-- The base part table (World 1). Event parts are registered separately and never appear here.
 function Parts.all(): { Def }
 	return all
+end
+
+-- Event parts (spec section 8): defined by event records, which are data, not code. Once an event's parts have been
+-- registered they stay registered for the life of the server, even after the event ends, so a player's saved event
+-- parts are never dropped when their profile loads. Ids follow Species_Slot like every part; a species may not reuse a
+-- base species name. They live in the area "Event", so the normal area pools never spawn them: only an active event's
+-- spawn override does. `tradable` defaults to false for event parts (spec: can be made non-tradable).
+export type EventPart = { species: string, slot: string, rarity: string }
+local eventIds: { [string]: { string } } = {}
+
+function Parts.registerEvent(eventId: string, list: { EventPart }, tradable: boolean?): (boolean, string)
+	local planned: { Def } = {}
+	for _, p in list do
+		local id = p.species .. "_" .. p.slot
+		local existing = byId[id]
+		if existing and existing.event ~= eventId then
+			return false, id .. " already exists"
+		end
+		table.insert(planned, { id = id, species = p.species, slot = p.slot, rarity = p.rarity, area = "Event", world = 1, event = eventId, tradable = tradable == true } :: any)
+	end
+	local ids = eventIds[eventId] or {}
+	for _, def in planned do
+		if byId[def.id] == nil then
+			table.insert(ids, def.id)
+		end
+		byId[def.id] = def
+	end
+	eventIds[eventId] = ids
+	return true, "ok"
+end
+
+function Parts.eventParts(eventId: string): { Def }
+	local out = {}
+	for _, id in eventIds[eventId] or {} do
+		table.insert(out, byId[id])
+	end
+	return out
+end
+
+function Parts.isEvent(id: string): boolean
+	local def = byId[id]
+	return def ~= nil and def.event ~= nil
 end
 
 function Parts.get(id: string): Def?
@@ -64,7 +107,7 @@ end
 -- Whether a part can be traded. Parts are tradable unless their catalog entry says `tradable = false` (event parts
 -- can be made non-tradable, spec section 8).
 function Parts.isTradable(id: string): boolean
-	local def = byId[id] :: any
+	local def = byId[id]
 	return def ~= nil and def.tradable ~= false
 end
 

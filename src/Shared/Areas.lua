@@ -26,6 +26,9 @@ export type Def = {
 	combat: boolean?,
 	unlockRebirths: number?,
 	pass: string?,
+	poolLike: string?, -- event areas: the existing area whose rarity mix to copy
+	chaserMult: number?, -- event areas: their own chaser tier
+	event: string?, -- event areas: the event that owns them
 }
 
 export type Settings = { Areas: any, Passes: any, Chase: any, Maze: any, Parts: any }
@@ -58,7 +61,7 @@ end
 
 -- Studs per second the area's chaser runs at: the expected player speed there times the tier multiplier.
 function Areas.chaserSpeed(cfg: Settings, def: Def): number
-	return def.expectedWalk * cfg.Chase.SpeedMultiplier[def.name]
+	return def.expectedWalk * (def.chaserMult or cfg.Chase.SpeedMultiplier[def.name])
 end
 
 -- The same maze and layout on every server (fixed seeds), so the area can be tuned and tested.
@@ -79,9 +82,11 @@ end
 -- the Rare area (10%) than of the Mythic area (17%), and the Common area is all Common. Rarity names are the area
 -- names (a part from a Mythic species is rolled as Mythic).
 function Areas.rarityShares(cfg: Settings, def: Def): { [string]: number }
-	local n = Areas.index(cfg, def.name) :: number
+	-- An event area copies the rarity mix of an existing area (poolLike) and is otherwise a normal area.
+	local poolName = def.poolLike or def.name
+	local n = Areas.index(cfg, poolName) :: number
 	if n == 1 then
-		return { [def.name] = 1 }
+		return { [poolName] = 1 }
 	end
 	local weights: { number } = {}
 	local sum = 0.0
@@ -90,7 +95,7 @@ function Areas.rarityShares(cfg: Settings, def: Def): { [string]: number }
 		weights[below] = w
 		sum += w
 	end
-	local shares: { [string]: number } = { [def.name] = cfg.Parts.TopShare }
+	local shares: { [string]: number } = { [poolName] = cfg.Parts.TopShare }
 	for below = 1, n - 1 do
 		shares[cfg.Areas[n - below].name] = (1 - cfg.Parts.TopShare) * weights[below] / sum
 	end
