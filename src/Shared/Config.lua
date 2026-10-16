@@ -19,6 +19,15 @@ local Config = {
 		LoopFraction = 0.12, -- share of interior walls knocked out so there are loops to run around (spec)
 	},
 
+	Area = {
+		Seed = 1, -- fixed so the Common maze is the same every server while we tune it
+		Width = 11, -- cells
+		Height = 11,
+		ExitCount = 3,
+		MinExitSeparation = 8, -- maze steps between exits and from the entrance
+		SpawnCells = 30, -- candidate cells for parts
+	},
+
 	Chase = {
 		-- Chaser speed relative to the expected player speed in that area (spec section 4).
 		SpeedMultiplier = {

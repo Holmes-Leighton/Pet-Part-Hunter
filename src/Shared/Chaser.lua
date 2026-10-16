@@ -15,7 +15,10 @@ export type Grid = {
 	findPath: (fx: number, fy: number, tx: number, ty: number) -> { { x: number, y: number } }?,
 }
 
-export type Chaser = typeof(setmetatable({} :: { grid: Grid, x: number, z: number, speed: number }, Chaser))
+export type Chaser = typeof(setmetatable(
+	{} :: { grid: Grid, x: number, z: number, speed: number, routeKey: number?, routeNext: { x: number, y: number }? },
+	Chaser
+))
 
 local EPS = 1e-6
 
@@ -76,11 +79,17 @@ function Chaser.step(self: Chaser, dt: number, tx: number, tz: number)
 			return
 		end
 
-		local path = self.grid.findPath(cx, cy, gx, gy)
-		if path == nil or #path < 2 then
-			return -- target is unreachable (should not happen in a connected maze)
+		-- The route only changes when the chaser's cell or the target's cell changes, so reuse the last search.
+		local routeKey = ((cy * 100 + cx) * 100 + gy) * 100 + gx
+		if self.routeKey ~= routeKey then
+			local path = self.grid.findPath(cx, cy, gx, gy)
+			if path == nil or #path < 2 then
+				return -- target is unreachable (should not happen in a connected maze)
+			end
+			self.routeKey = routeKey
+			self.routeNext = path[2]
 		end
-		local nextCell = path[2]
+		local nextCell = self.routeNext :: { x: number, y: number }
 		local centreX, centreZ = self.grid.cellToWorld(cx, cy)
 		local nextX, nextZ = self.grid.cellToWorld(nextCell.x, nextCell.y)
 		local movingX = nextCell.x ~= cx

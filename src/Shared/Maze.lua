@@ -174,6 +174,26 @@ function Maze.findPath(maze: Maze, fromX: number, fromY: number, toX: number, to
 	return path
 end
 
+-- Steps from (fromX, fromY) to every cell, keyed by (y - 1) * width + x. Unreachable cells are absent.
+function Maze.distances(maze: Maze, fromX: number, fromY: number): { [number]: number }
+	local dist: { [number]: number } = { [index(maze, fromX, fromY)] = 0 }
+	local queue = { { x = fromX, y = fromY } }
+	local head = 1
+	while head <= #queue do
+		local cur = queue[head]
+		head += 1
+		local d = dist[index(maze, cur.x, cur.y)]
+		for _, n in Maze.neighbors(maze, cur.x, cur.y) do
+			local k = index(maze, n.x, n.y)
+			if dist[k] == nil then
+				dist[k] = d + 1
+				table.insert(queue, n)
+			end
+		end
+	end
+	return dist
+end
+
 function Maze.cellToWorld(x: number, y: number, cellSize: number): (number, number)
 	return (x - 0.5) * cellSize, (y - 0.5) * cellSize
 end
