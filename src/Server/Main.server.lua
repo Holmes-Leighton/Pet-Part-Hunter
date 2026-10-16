@@ -20,6 +20,7 @@ local Run = require(Shared:WaitForChild("Run"))
 
 local AreaBuilder = require(script.Parent:WaitForChild("AreaBuilder"))
 local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
+local Progression = require(script.Parent:WaitForChild("Progression"))
 
 local CELL = Config.Maze.CellSize
 local AREA = "Common"
@@ -199,6 +200,10 @@ local function endRun(player: Player)
 	setHud(player, nil)
 end
 
+Progression.start(AreaBuilder.buildPads(Config, world:FindFirstChild("Lobby") :: Instance), function(player)
+	return runs[player] ~= nil
+end, notify)
+
 -- Chaser speed for new runs. In Studio only, the DebugChaserSpeed workspace attribute overrides it so playtests
 -- can freeze the chaser (0) or speed it up without editing code.
 local function chaserSpeed(): number
@@ -236,8 +241,7 @@ local function startRun(player: Player)
 end
 
 local function onCharacter(player: Player, char: Model)
-	local humanoid = char:WaitForChild("Humanoid") :: Humanoid
-	humanoid.WalkSpeed = Config.Player.WalkSpeed
+	local humanoid = char:WaitForChild("Humanoid") :: Humanoid -- WalkSpeed is set by Progression from saved Speed
 	-- Resetting or dying mid-run counts as being caught: the run ends and the bag is lost.
 	if runs[player] then
 		endRun(player)
@@ -273,10 +277,6 @@ RunService.Heartbeat:Connect(function(dt)
 		local root = rootOf(player)
 		if root == nil then
 			continue
-		end
-		local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
-		if humanoid and humanoid.WalkSpeed ~= Config.Player.WalkSpeed then
-			humanoid.WalkSpeed = Config.Player.WalkSpeed -- server owns walk speed
 		end
 
 		local pr = runs[player]

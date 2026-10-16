@@ -122,6 +122,30 @@ function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, e
 	return { spawn = spawn.Position + Vector3.new(0, 3, 0), enterPad = enterAt }
 end
 
+-- Running pads in the lobby: one per tier in a row. Standing on one trains Speed (the server does the counting).
+-- Returns each pad's tier and position so the server can tell who is standing where.
+local PAD_COLORS = {
+	Color3.fromRGB(235, 235, 235),
+	Color3.fromRGB(120, 220, 120),
+	Color3.fromRGB(90, 180, 255),
+	Color3.fromRGB(190, 120, 255),
+	Color3.fromRGB(255, 170, 60),
+	Color3.fromRGB(255, 80, 100),
+}
+
+function AreaBuilder.buildPads(cfg: any, parent: Instance): { { tier: number, x: number, z: number, radius: number } }
+	local out = {}
+	local radius = 4
+	for i, def in cfg.Pads do
+		local x, z = -75 + (i - 1) * 10, 80
+		local p = pad("RunPad" .. i, x, z, radius, PAD_COLORS[i] or PAD_COLORS[1], parent)
+		p:SetAttribute("Tier", def.tier)
+		label(p, string.format("PAD %d  +%d/s", def.tier, def.rate), PAD_COLORS[i] or PAD_COLORS[1])
+		table.insert(out, { tier = def.tier, x = x, z = z, radius = radius })
+	end
+	return out
+end
+
 -- Sanity checks on the built area; returns a list of problems (empty = fine). Used by the in-Studio checks.
 function AreaBuilder.validate(Maze: any, maze: any, layout: any, cfg: any, model: Model): { string }
 	local problems: { string } = {}
