@@ -7,6 +7,7 @@
 -- non-tradable passes, boosts and cosmetics.
 
 local Crafting = require("./Crafting")
+local House = require("./House")
 local Parts = require("./Parts")
 
 local Economy = {}
@@ -21,6 +22,8 @@ export type Data = {
 	nextUid: number,
 	petSlots: number,
 	bagUpgrades: number,
+	robuxBagSlots: number, -- repeatable Robux bag slots, no upper limit
+	furniture: { [string]: number },
 	insurance: number,
 	luckUntil: number, -- epoch seconds the luck boost runs until (0 = none)
 	receipts: { string },
@@ -51,8 +54,15 @@ function Economy.luck(cfg: Settings, data: Data, now: number): number
 	return luck
 end
 
--- Bag capacity for a new run: the start capacity, plus bought upgrades, the best bag pass and the equipped pets'
--- bag bonus, never above the hard ceiling.
+-- The free path to a bigger bag: the start capacity, coin upgrades and the equipped pets' bag bonus, held under the
+-- ceiling in Config.Bag.MaxCapacity.
+function Economy.freeCapacity(cfg: Settings, data: Data): number
+	local cap = cfg.Bag.StartCapacity + data.bagUpgrades + Crafting.equippedStats(cfg, data :: any).bag
+	return math.min(cap, cfg.Bag.MaxCapacity)
+end
+
+-- Bag capacity for a new run. Paying Robux has no ceiling: the best bag pass and every Robux bag slot bought are
+-- added on top of the free path, however many there are.
 function Economy.bagCapacity(cfg: Settings, data: Data): number
 	local pass = 0
 	for key, slots in cfg.Economy.BagPass do
@@ -60,8 +70,7 @@ function Economy.bagCapacity(cfg: Settings, data: Data): number
 			pass = math.max(pass, slots)
 		end
 	end
-	local cap = cfg.Bag.StartCapacity + data.bagUpgrades + pass + Crafting.equippedStats(cfg, data :: any).bag
-	return math.min(cap, cfg.Bag.MaxCapacity)
+	return Economy.freeCapacity(cfg, data) + pass + data.robuxBagSlots
 end
 
 -- Passes that change stored numbers (call after load and after a pass is granted).
@@ -200,7 +209,7 @@ function Economy.buyBagUpgrade(cfg: Settings, data: Data): (boolean, string)
 	if cost == nil then
 		return false, "your bag is fully upgraded"
 	end
-	if Economy.bagCapacity(cfg, data) >= cfg.Bag.MaxCapacity then
+	if Economy.freeCapacity(cfg, data) >= cfg.Bag.MaxCapacity then
 		return false, "your bag is already as big as it can get"
 	end
 	if data.coins < cost then
@@ -284,6 +293,33 @@ function Economy.grantProduct(cfg: Settings, data: Data, key: string, now: numbe
 	if p.uses then
 		data.insurance += p.uses
 	end
+	if p.bagSlots then
+		data.robuxBagSlots += p.bagSlots
+	end
+	return true
+end
+
+-- Premium furniture is sold as one developer product per item (spec section 7). Returns the furniture id for a
+-- product id, or nil. Id 0 means "not set up yet" and never matches.
+function Economy.furnitureProduct(cfg: Settings, productId: number): string?
+	if productId == 0 then
+		return nil
+	end
+	for _, def in cfg.Furniture do
+		if def.premium and def.product == productId then
+			return def.id
+		end
+	end
+	return nil
+end
+
+-- Grants one premium furniture item. Basic furniture is coin-only and cannot be granted through a purchase.
+function Economy.grantFurniture(cfg: Settings, data: Data, id: string): boolean
+	local def = House.def(cfg, id)
+	if def == nil or not def.premium then
+		return false
+	end
+	data.furniture[id] = (data.furniture[id] or 0) + 1
 	return true
 end
 

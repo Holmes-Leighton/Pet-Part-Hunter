@@ -61,7 +61,7 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- The shop ------------------------------------------------------------------------------------------------------------
-type Entry = { kind: "pass" | "product", key: string, desc: string }
+type Entry = { kind: "pass" | "product" | "furniture", key: string, desc: string }
 
 local TABS: { [string]: { Entry } } = {
 	Passes = {
@@ -81,12 +81,20 @@ local TABS: { [string]: { Entry } } = {
 	Boosts = {
 		{ kind = "product", key = "LuckBoost", desc = "Better stat rolls for 30 minutes" },
 		{ kind = "product", key = "Insurance", desc = "Keep your bag if caught (one use)" },
+		{ kind = "product", key = "BagSlot", desc = "+1 bag slot. Buy as many as you like, no limit" },
 		{ kind = "product", key = "CoinPackSmall", desc = "+2,000 coins" },
 		{ kind = "product", key = "CoinPackMedium", desc = "+12,000 coins" },
 		{ kind = "product", key = "CoinPackLarge", desc = "+60,000 coins" },
 	},
 }
-local TAB_ORDER = { "Passes", "Areas", "Boosts" }
+-- Premium furniture: one Robux product per item, straight from the furniture catalog.
+TABS.Furniture = {}
+for _, f in Config.Furniture :: any do
+	if f.premium then
+		table.insert(TABS.Furniture, { kind = "furniture", key = f.id, desc = string.format("%s, %dx%d. Robux-only, not tradable", f.surface, f.w, f.d) })
+	end
+end
+local TAB_ORDER = { "Passes", "Areas", "Boosts", "Furniture" }
 local currentTab = "Passes"
 local prices: { [string]: number } = {} -- "pass:key" / "product:key" -> Robux, filled in from Roblox
 
@@ -122,12 +130,27 @@ local list = UiKit.list(panel, UDim2.fromOffset(12, 108), UDim2.new(1, -24, 1, -
 local render: () -> ()
 
 local function idOf(e: Entry): number
+	if e.kind == "furniture" then
+		for _, f in Config.Furniture :: any do
+			if f.id == e.key then
+				return f.product
+			end
+		end
+		return 0
+	end
 	local source: any = if e.kind == "pass" then Config.Passes else Config.Products
 	local v = source[e.key]
 	return if type(v) == "table" then v.id else v
 end
 
 local function nameOf(e: Entry): string
+	if e.kind == "furniture" then
+		for _, f in Config.Furniture :: any do
+			if f.id == e.key then
+				return f.name
+			end
+		end
+	end
 	local n = if e.kind == "pass" then (Config.PassNames :: any)[e.key] else (Config.Products :: any)[e.key].name
 	local trimmed = string.gsub(n, "^the ", "")
 	trimmed = string.gsub(trimmed, "^a ", "")

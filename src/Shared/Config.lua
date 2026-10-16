@@ -103,9 +103,9 @@ local Config = {
 		{ id = "Lamp", name = "Hanging Lamp", surface = "ceiling", w = 1, d = 1, h = 2, coins = 40, color = { 255, 230, 150 } },
 		{ id = "Fan", name = "Ceiling Fan", surface = "ceiling", w = 2, d = 2, h = 1, coins = 150, color = { 200, 200, 210 } },
 		{ id = "Chandelier", name = "Chandelier", surface = "ceiling", w = 2, d = 2, h = 3, coins = 220, color = { 255, 215, 120 } },
-		{ id = "CandySofa", name = "Candy Sofa", surface = "floor", w = 3, d = 1, h = 3, premium = true, robux = 99, color = { 255, 120, 190 } },
-		{ id = "CandyLamp", name = "Candy Lamp", surface = "ceiling", w = 1, d = 1, h = 2, premium = true, robux = 49, color = { 255, 150, 90 } },
-		{ id = "CandyPainting", name = "Candy Painting", surface = "wall", w = 2, d = 2, h = 1, premium = true, robux = 59, color = { 190, 120, 255 } },
+		{ id = "CandySofa", name = "Candy Sofa", surface = "floor", w = 3, d = 1, h = 3, premium = true, product = 0, robux = 99, color = { 255, 120, 190 } },
+		{ id = "CandyLamp", name = "Candy Lamp", surface = "ceiling", w = 1, d = 1, h = 2, premium = true, product = 0, robux = 49, color = { 255, 150, 90 } },
+		{ id = "CandyPainting", name = "Candy Painting", surface = "wall", w = 2, d = 2, h = 1, premium = true, product = 0, robux = 59, color = { 190, 120, 255 } },
 	} :: any),
 
 	-- Pets shown in the world (client side). Every player's equipped pets are visible to everyone, following their owner
@@ -159,7 +159,7 @@ local Config = {
 
 	Bag = {
 		StartCapacity = 3, -- (spec)
-		MaxCapacity = 12, -- hard ceiling after upgrades, passes and pets (the bag UI draws this many slots)
+		MaxCapacity = 12, -- ceiling for the free path (coin upgrades + pets). Robux bag slots and passes add on top, unlimited
 	},
 
 	Maze = {
@@ -207,6 +207,7 @@ local Config = {
 		CoinPackLarge = { id = 0, name = "a Large Coin Pack", coins = 60000 },
 		LuckBoost = { id = 0, name = "a 30 minute Luck Boost", seconds = 1800, luck = 100 }, -- luck % while active
 		Insurance = { id = 0, name = "Bag Insurance", uses = 1 }, -- keep the bag if caught, one use
+		BagSlot = { id = 0, name = "a Bag Slot", bagSlots = 1 }, -- repeatable: +1 bag slot each, with no upper limit
 	} :: any),
 
 	-- Coins (spec section 7). Selling is the main source; sinks must grow so coins do not pile up.

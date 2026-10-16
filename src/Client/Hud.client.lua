@@ -39,21 +39,27 @@ bagFrame.Size = UDim2.fromOffset(260, 90)
 bagFrame.BackgroundTransparency = 1
 bagFrame.Parent = gui
 local bagTitle = label(bagFrame, "Title", UDim2.new(1, 0, 0, 24), UDim2.fromOffset(0, 0), Vector2.zero, 20)
+-- Bag slots are drawn on demand: Robux bag slots have no upper limit, so there is no fixed maximum. Slots wrap into
+-- rows of PER_ROW, and past MAX_DRAWN only the "BAG n/m" count is shown so a huge bag cannot flood the screen.
 local slots: { Frame } = {}
-local MAX_SLOTS = 12 -- Config.Bag.MaxCapacity
-for i = 1, MAX_SLOTS do
-	local f = Instance.new("Frame")
-	f.Name = "Slot" .. i
-	f.Size = UDim2.fromOffset(70, 56)
-	f.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-	f.BackgroundTransparency = 0.25
-	f.BorderSizePixel = 0
-	f.Visible = false
-	f.Parent = bagFrame
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 10)
-	c.Parent = f
-	table.insert(slots, f)
+local PER_ROW = 10
+local MAX_DRAWN = 40
+local function ensureSlot(i: number): Frame
+	local f = slots[i]
+	if f == nil then
+		f = Instance.new("Frame")
+		f.Name = "Slot" .. i
+		f.Size = UDim2.fromOffset(60, 44)
+		f.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+		f.BackgroundTransparency = 0.25
+		f.BorderSizePixel = 0
+		f.Parent = bagFrame
+		local c = Instance.new("UICorner")
+		c.CornerRadius = UDim.new(0, 10)
+		c.Parent = f
+		slots[i] = f
+	end
+	return f
 end
 
 -- Escape progress bar (centre bottom, above the bag).
@@ -102,11 +108,18 @@ local function refresh()
 
 	bagFrame.Visible = running
 	bagTitle.Text = string.format("BAG %d/%d", count, capacity)
-	bagFrame.Size = UDim2.fromOffset(capacity * 76, 90)
-	for i, f in slots do
-		f.Visible = i <= capacity
-		f.Position = UDim2.fromOffset((i - 1) * 76, 30)
+	local drawn = math.min(capacity, MAX_DRAWN)
+	local columns = math.min(drawn, PER_ROW)
+	local rows = math.ceil(drawn / PER_ROW)
+	bagFrame.Size = UDim2.fromOffset(math.max(columns, 1) * 66, 30 + rows * 50)
+	for i = 1, drawn do
+		local f = ensureSlot(i)
+		f.Visible = true
+		f.Position = UDim2.fromOffset(((i - 1) % PER_ROW) * 66, 30 + math.floor((i - 1) / PER_ROW) * 50)
 		f.BackgroundColor3 = if i <= count then Color3.fromRGB(255, 200, 70) else Color3.fromRGB(30, 30, 40)
+	end
+	for i = drawn + 1, #slots do
+		slots[i].Visible = false
 	end
 
 	local progress = ((player:GetAttribute("EscapeProgress") :: number?) or 0) / 100

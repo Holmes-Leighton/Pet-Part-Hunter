@@ -26,6 +26,7 @@ export type Data = {
 	nextUid: number, -- next unique id for parts and pets
 	petSlots: number, -- how many pets can be equipped
 	bagUpgrades: number, -- bought bag slots
+	robuxBagSlots: number, -- repeatable Robux bag slots (unlimited)
 	insurance: number, -- unused bag insurance charges
 	luckUntil: number, -- epoch seconds a luck boost runs until
 	receipts: { string }, -- recent purchase receipts (never grant one twice)
@@ -52,6 +53,7 @@ function Profile.default(version: number, startSlots: number?): Data
 		nextUid = 1,
 		petSlots = startSlots or 2,
 		bagUpgrades = 0,
+		robuxBagSlots = 0,
 		insurance = 0,
 		luckUntil = 0,
 		receipts = {},
@@ -152,6 +154,7 @@ function Profile.load(raw: any, cfg: Settings): Data
 	end
 	Areas.refreshUnlocks(cfg, out) -- free areas, plus anything the saved rebirths or passes already earn
 	out.bagUpgrades = whole(raw.bagUpgrades, 0, cfg.Economy.BagUpgrade.max)
+	out.robuxBagSlots = whole(raw.robuxBagSlots, 0, 100000) -- sanity bound only; real purchases are far below it
 	out.insurance = whole(raw.insurance, 0, 9999)
 	out.luckUntil = nonNegative(raw.luckUntil, 0)
 	if type(raw.receipts) == "table" then

@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local House = require(Shared:WaitForChild("House"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
@@ -122,14 +123,22 @@ function EconomyService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 			return Enum.ProductPurchaseDecision.NotProcessedYet -- Roblox retries when they are back
 		end
 		local key = Economy.productKey(Config, info.ProductId)
-		if key == nil then
+		local furnitureId = if key == nil then Economy.furnitureProduct(Config, info.ProductId) else nil
+		if key == nil and furnitureId == nil then
 			warn("[PetPartHunter] purchase of an unknown product " .. tostring(info.ProductId))
 			return Enum.ProductPurchaseDecision.NotProcessedYet
 		end
 		if Economy.recordReceipt(Config, data, tostring(info.PurchaseId)) then
-			Economy.grantProduct(Config, data, key, os.time())
-			Analytics.log(player, "ProductPurchased", info.ProductId, { product = key })
-			Announcer.purchase(player, Config.Products[key].name)
+			local what: string
+			if key then
+				Economy.grantProduct(Config, data, key, os.time())
+				what = Config.Products[key].name
+			else
+				Economy.grantFurniture(Config, data, furnitureId :: string)
+				what = "the " .. (House.def(Config, furnitureId :: string) :: any).name
+			end
+			Analytics.log(player, "ProductPurchased", info.ProductId, { product = key or furnitureId })
+			Announcer.purchase(player, what)
 			EconomyService.publish(player)
 			CraftService.push(player)
 		end

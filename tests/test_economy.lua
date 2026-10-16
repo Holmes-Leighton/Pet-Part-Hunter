@@ -166,20 +166,75 @@ Test.case("bag upgrades: +1 slot each, costs climb steeply, capped; coins are sp
 	Test.eq(poor.coins, 149)
 end)
 
-Test.case("bag capacity adds bag passes (best one only) and pet bag slots, under the hard ceiling", function()
+Test.case("bag capacity: the free path (coin upgrades + pets) stops at the ceiling, Robux has no ceiling", function()
 	local d = fresh()
 	d.passes.ExtraBag1 = true
 	Test.eq(Economy.bagCapacity(Config, d), 3 + 2)
 	d.passes.ExtraBag2 = true
-	Test.eq(Economy.bagCapacity(Config, d), 3 + 4, "tiers do not stack")
+	Test.eq(Economy.bagCapacity(Config, d), 3 + 4, "pass tiers do not stack")
 	d.bagUpgrades = 5
-	Test.eq(Economy.bagCapacity(Config, d), 12, "3 + 5 + 4")
+	Test.eq(Economy.bagCapacity(Config, d), 3 + 5 + 4)
 	d.coins = 1000
 	local body = give(d, "Frog_Body", 1)[1]
 	body.stats.bag = 3
 	local pet = Crafting.buildPet(Config, d, { Body = body.uid }) :: Crafting.Pet
 	Crafting.equip(d, pet.uid)
-	Test.eq(Economy.bagCapacity(Config, d), Config.Bag.MaxCapacity, "capped")
+	Test.eq(Economy.freeCapacity(Config, d), 3 + 5 + 3, "free path: start + upgrades + pet")
+	Test.eq(Economy.bagCapacity(Config, d), 3 + 5 + 3 + 4, "the pass is added on top")
+	-- Push the free path past its ceiling: it stops, the Robux part keeps growing.
+	d.bagUpgrades = 50
+	Test.eq(Economy.freeCapacity(Config, d), Config.Bag.MaxCapacity)
+	Test.eq(Economy.bagCapacity(Config, d), Config.Bag.MaxCapacity + 4)
+	d.robuxBagSlots = 100
+	Test.eq(Economy.bagCapacity(Config, d), Config.Bag.MaxCapacity + 4 + 100, "Robux bag slots are unlimited")
+	d.robuxBagSlots = 5000
+	Test.eq(Economy.bagCapacity(Config, d), Config.Bag.MaxCapacity + 4 + 5000)
+end)
+
+Test.case("the Bag Slot product is repeatable and each one adds a slot", function()
+	local d = fresh()
+	Test.eq(Economy.bagCapacity(Config, d), 3)
+	for n = 1, 40 do
+		Test.truthy(Economy.grantProduct(Config, d, "BagSlot", 0))
+		Test.eq(Economy.bagCapacity(Config, d), 3 + n)
+	end
+	-- Coin upgrades are refused once the free path is full, but Robux slots never are.
+	local full = fresh()
+	full.coins = 1e12
+	full.bagUpgrades = 5
+	full.robuxBagSlots = 20
+	Test.eq(Economy.freeCapacity(Config, full), 8)
+	Test.eq({ Economy.buyBagUpgrade(Config, full) }, { false, "your bag is fully upgraded" })
+end)
+
+Test.case("premium furniture: one product per item, granted through a purchase, never for coins", function()
+	local cfg: any = table.clone(Config)
+	cfg.Furniture = table.clone(Config.Furniture)
+	local sofa: any = table.clone(Config.Furniture[18])
+	Test.eq(sofa.id, "CandySofa")
+	sofa.product = 777
+	cfg.Furniture[18] = sofa
+	Test.eq(Economy.furnitureProduct(cfg, 777), "CandySofa")
+	Test.eq(Economy.furnitureProduct(cfg, 778), nil)
+	Test.eq(Economy.furnitureProduct(Config, 0), nil, "id 0 is not set up yet")
+	local d = fresh()
+	Test.eq(Economy.grantFurniture(cfg, d, "CandySofa"), true)
+	Test.eq(Economy.grantFurniture(cfg, d, "CandySofa"), true)
+	Test.eq(d.furniture.CandySofa, 2, "repeat purchases stack")
+	Test.eq(Economy.grantFurniture(cfg, d, "Chair"), false, "basic furniture is coin-only")
+	Test.eq(Economy.grantFurniture(cfg, d, "Nope"), false)
+end)
+
+Test.case("every premium item has a product slot and a Robux price", function()
+	local n = 0
+	for _, f in Config.Furniture :: any do
+		if f.premium then
+			n += 1
+			Test.truthy(f.product ~= nil and f.product >= 0, f.id .. " product")
+			Test.truthy(f.robux ~= nil and f.robux > 0, f.id .. " robux price")
+		end
+	end
+	Test.truthy(n >= 3)
 end)
 
 Test.case("pet slots: slots 3 and 4 for coins, 5 and 6 only with the pass", function()
@@ -271,7 +326,7 @@ end)
 
 Test.case("economy numbers survive saving and loading; hacked values are repaired", function()
 	local d = fresh()
-	d.bagUpgrades, d.insurance, d.luckUntil = 3, 2, 5000
+	d.bagUpgrades, d.insurance, d.luckUntil, d.robuxBagSlots = 3, 2, 5000, 9
 	d.receipts = { "a", "b" }
 	d.stats = { coinsEarned = 77, coinsSpent = 12 }
 	Test.eq(Profile.load(d, Config), d)
@@ -286,7 +341,7 @@ end)
 Test.case("every product and pass has what the shop needs", function()
 	for key, p in Config.Products :: any do
 		Test.truthy(type(p.name) == "string" and p.id >= 0, key)
-		Test.truthy(p.coins ~= nil or p.seconds ~= nil or p.uses ~= nil, key .. " does something")
+		Test.truthy(p.coins ~= nil or p.seconds ~= nil or p.uses ~= nil or p.bagSlots ~= nil, key .. " does something")
 	end
 	for key in Config.Passes :: any do
 		Test.truthy((Config.PassNames :: any)[key] ~= nil, key)
