@@ -108,6 +108,15 @@ local Config = {
 		{ id = "CandyPainting", name = "Candy Painting", surface = "wall", w = 2, d = 2, h = 1, premium = true, robux = 59, color = { 190, 120, 255 } },
 	} :: any),
 
+	-- Pets shown in the world (client side). Every player's equipped pets are visible to everyone, following their owner
+	-- around the lobby and wandering in the owner's house. Limits keep this cheap on phones (spec section 6).
+	PetDisplay = {
+		ShowDistance = 120, -- studs: pets of players further than this are not built or animated
+		MaxModels = 48, -- most pet models alive at once on one client
+		HideDuringRuns = true, -- owners in an area run show no pets (less clutter while being chased)
+		TagFromRarity = 4, -- pets with a part at least this rarity (index in Areas; 4 = Super Rare) get a rarity tag
+	},
+
 	-- Remote rate limits (spec section 9).
 	RateLimit = {
 		Home = { perSecond = 4, burst = 8 },

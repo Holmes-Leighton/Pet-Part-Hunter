@@ -255,4 +255,24 @@ Test.case("a saved inventory survives loading, and bad items are dropped", funct
 	end
 end)
 
+Test.case("public pets: only equipped pets, only part ids and tiers, in equip order", function()
+	local d = fresh()
+	d.coins = 1000
+	local made = {}
+	for i = 1, 3 do
+		local head = give(d, "Chicken_Head", 1, i)[1]
+		local legs = give(d, "Tiger_Legs", 1, i + 10)[1]
+		table.insert(made, (Crafting.buildPet(Config, d, { Head = head.uid, Legs = legs.uid }) :: Crafting.Pet).uid)
+	end
+	Test.eq(#Crafting.publicPets(d), 0, "nothing equipped, nothing shown")
+	Crafting.equip(d, made[2])
+	Crafting.equip(d, made[1])
+	local pub = Crafting.publicPets(d)
+	Test.eq(#pub, 2)
+	Test.eq(pub[1].uid, made[2])
+	Test.eq(pub[2].uid, made[1])
+	Test.eq(pub[1].slots, { Head = { id = "Chicken_Head", tier = 1 }, Legs = { id = "Tiger_Legs", tier = 1 } })
+	Test.eq(pub[1].slots.Head.stats, nil, "stats stay private")
+end)
+
 Test.done()

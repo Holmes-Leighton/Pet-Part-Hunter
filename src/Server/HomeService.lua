@@ -236,6 +236,9 @@ function HomeService.start(inRun: (Player) -> boolean, notify: RemoteEvent, lobb
 			if not usedSlots[slot] then
 				usedSlots[slot] = true
 				plots[player] = buildRoom(player, slot)
+				-- Public so every client can place this player's pets in their room.
+				player:SetAttribute("PlotX", plots[player].ox)
+				player:SetAttribute("PlotZ", plots[player].oz)
 				return
 			end
 		end

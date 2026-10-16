@@ -216,6 +216,26 @@ function Crafting.unequip(data: Data, petUid: number): boolean
 	return true
 end
 
+-- What everyone else may see of a player's pets (spec: pets are a status symbol, so every client shows every
+-- player's equipped pets). Only ids and tiers go out, never stats or inventory. Order is the equip order.
+export type PublicPet = { uid: number, slots: { [string]: { id: string, tier: number } } }
+
+function Crafting.publicPets(data: Data): { PublicPet }
+	local out: { PublicPet } = {}
+	for _, uid in data.equippedPets do
+		for _, pet in data.pets do
+			if pet.uid == uid then
+				local slots: { [string]: { id: string, tier: number } } = {}
+				for socket, item in pet.slots do
+					slots[socket] = { id = item.id, tier = item.tier }
+				end
+				table.insert(out, { uid = pet.uid, slots = slots })
+			end
+		end
+	end
+	return out
+end
+
 -- Part Index progress: entries found out of every part in the game. Entries stay when parts are sold or used.
 function Crafting.indexProgress(data: Data): (number, number)
 	local found = 0

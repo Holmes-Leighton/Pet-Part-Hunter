@@ -3,6 +3,7 @@
 -- only asks; every rule lives in Shared/Crafting and is checked on the server, rate-limited, and all or nothing.
 -- After every change the player gets a fresh snapshot of their inventory (InventoryState) to draw.
 
+local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -42,6 +43,8 @@ function CraftService.push(player: Player)
 		return
 	end
 	player:SetAttribute("Banked", #data.parts)
+	-- Equipped pets are public: every client reads this attribute and shows the pets (see PetDisplay on the client).
+	player:SetAttribute("PetsEquipped", HttpService:JSONEncode(Crafting.publicPets(data)))
 	local parts = {}
 	for _, item in data.parts do
 		table.insert(parts, itemView(item))
