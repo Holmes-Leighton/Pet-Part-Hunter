@@ -34,6 +34,7 @@ local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local HomeService = require(script.Parent:WaitForChild("HomeService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Progression = require(script.Parent:WaitForChild("Progression"))
+local TradeService = require(script.Parent:WaitForChild("TradeService"))
 
 local CELL = Config.Maze.CellSize
 local AREA_SPACING = 300 -- studs between area origins along X; the biggest maze is 16 cells x 16 studs
@@ -251,11 +252,15 @@ end
 Progression.start(AreaBuilder.buildPads(Config, world:FindFirstChild("Lobby") :: Instance), function(player)
 	return runs[player] ~= nil
 end, notify)
+-- Crafting and the economy refuse to change a player's inventory during a run or while they are in a trade window.
 CraftService.start(function(player)
-	return runs[player] ~= nil
+	return runs[player] ~= nil or TradeService.isBusy(player)
 end, notify)
 AreaAccess.start(notify)
 EconomyService.start(function(player)
+	return runs[player] ~= nil or TradeService.isBusy(player)
+end, notify)
+TradeService.start(function(player)
 	return runs[player] ~= nil
 end, notify)
 HomeService.start(function(player)

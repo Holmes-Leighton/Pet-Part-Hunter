@@ -61,7 +61,7 @@ function EconomyService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 			return
 		end
 		if inRun(player) then
-			tell(player, "Finish your run first!")
+			tell(player, "Not right now: finish your run or trade first!")
 			return
 		end
 		if action == "Sell" then

@@ -130,7 +130,7 @@ function CraftService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 			return
 		end
 		if inRunCheck(player) then
-			tell(player, "Finish your run first!")
+			tell(player, "Not right now: finish your run or trade first!")
 			return
 		end
 		if action == "Build" then
