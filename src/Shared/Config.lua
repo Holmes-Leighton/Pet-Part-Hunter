@@ -131,10 +131,35 @@ local Config = {
 	Backend = {
 		TradeStore = "PetPartHunterTradeLog_v1",
 		EventStore = "PetPartHunterEvents_v1", -- events are data records stored here, edited from the admin panel
+		AuditStore = "PetPartHunterAudit_v1", -- every admin action, one list per day
+		BanStore = "PetPartHunterBans_v1",
+		SnapshotStore = "PetPartHunterSnapshots_v1", -- recent copies of each player's data, for rollbacks
+		TuningStore = "PetPartHunterTuning_v1", -- live settings changed from the admin panel
+		AuditLogUrl = "", -- optional: also POST every audit entry to your backend (same secret as the trade log)
+		MetricsUrl = "", -- optional: your monitoring backend; batched metrics are POSTed here every minute
+		AlertUrl = "", -- optional: relay for serious events (Discord often blocks Roblox, so point this at a small relay)
 		MaxIndexPerPlayer = 200, -- recent trades remembered per player in the index
 		SaveRetries = 3,
 		TradeLogUrl = "", -- your backend endpoint; empty = DataStore only. Needs HttpService enabled
 		SecretName = "TradeLogKey", -- name of the Roblox secret holding the backend API key (never put the key in code)
+	},
+
+	-- Admin tools (spec section 8). Access is by listed user id or group rank and is checked on the server for every
+	-- action; the client panel is only a front end. Roles: mod < admin < owner.
+	Admin = {
+		Owners = ({} :: any), -- user ids, e.g. { 12345678 }
+		Admins = ({} :: any),
+		Mods = ({} :: any),
+		GroupId = 0, -- 0 = no group
+		GroupRanks = { Mod = 100, Admin = 200, Owner = 255 }, -- the group rank at or above which each role applies
+		StudioIsOwner = true, -- in Studio the person testing is an owner; never applies on live servers
+		MaxCoinGrant = 10000000,
+		MaxPartGrant = 50,
+		MaxBanSeconds = 315360000, -- 10 years; 0 means permanent
+		SnapshotCount = 6, -- recent data snapshots kept per player
+		SnapshotMinutes = 10, -- how often a connected player's data is snapshotted
+		AuditMaxPerDay = 2000,
+		RateLimit = { perSecond = 3, burst = 10 },
 	},
 
 	-- Pets shown in the world (client side). Every player's equipped pets are visible to everyone, following their owner
