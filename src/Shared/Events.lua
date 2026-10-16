@@ -237,6 +237,32 @@ function Events.aggregate(active: { Event }): Mods
 	return mods
 end
 
+-- A short line for the HUD banner and announcements, e.g. "2x coins, +100% luck, chaser x0.9".
+function Events.describe(ev: Event): string
+	local bits: { string } = {}
+	for _, m in ev.modifiers or {} do
+		if m.kind == "luck" then
+			table.insert(bits, string.format("+%d%% luck", m.add or 0))
+		elseif m.kind == "coins" then
+			table.insert(bits, string.format("%sx coins", tostring(m.mult)))
+		elseif m.kind == "speed" then
+			table.insert(bits, string.format("%sx speed gain", tostring(m.mult)))
+		elseif m.kind == "chaser" then
+			table.insert(bits, if (m.mult or 1) < 1 then "slower chasers" else "faster chasers")
+		end
+	end
+	if ev.spawn then
+		table.insert(bits, "exclusive parts")
+	end
+	if ev.area then
+		table.insert(bits, ev.area.name .. " area")
+	end
+	if ev.goal then
+		table.insert(bits, "community goal")
+	end
+	return table.concat(bits, ", ")
+end
+
 -- Spawn pools ---------------------------------------------------------------------------------------------------------
 -- The part templates for an area while events are active: the normal pool scaled down, with each event's exclusive
 -- parts taking their share. `base` is the area's normal templates (weights add up to about 1).

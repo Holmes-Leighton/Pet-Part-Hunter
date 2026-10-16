@@ -32,9 +32,10 @@ export type Data = {
 export type Settings = any
 
 -- Bonuses -----------------------------------------------------------------------------------------------------------
--- Multiplier on coins gained: the 2x coins pass times the equipped pets' coin bonus (a percentage).
-function Economy.coinMultiplier(cfg: Settings, data: Data): number
-	local mult = 1 + Crafting.equippedStats(cfg, data :: any).coin / 100
+-- Multiplier on coins gained: the 2x coins pass times the equipped pets' coin bonus (a percentage) times any
+-- running event's coin boost (`eventMult`, from Shared/Events.aggregate).
+function Economy.coinMultiplier(cfg: Settings, data: Data, eventMult: number?): number
+	local mult = (1 + Crafting.equippedStats(cfg, data :: any).coin / 100) * (eventMult or 1)
 	if data.passes.DoubleCoins then
 		mult *= 2
 	end
@@ -46,8 +47,8 @@ function Economy.luckBoostActive(data: Data, now: number): boolean
 end
 
 -- Luck percentage for rolling new parts: equipped pets plus an active luck boost.
-function Economy.luck(cfg: Settings, data: Data, now: number): number
-	local luck = Crafting.equippedStats(cfg, data :: any).luck
+function Economy.luck(cfg: Settings, data: Data, now: number, eventAdd: number?): number
+	local luck = Crafting.equippedStats(cfg, data :: any).luck + (eventAdd or 0)
 	if Economy.luckBoostActive(data, now) then
 		luck += cfg.Products.LuckBoost.luck
 	end
@@ -104,7 +105,7 @@ end
 
 -- Sell the named parts (by uid) to the shop. All or nothing: every uid must be a part the player holds, once each.
 -- Returns true and the coins gained, or false and why.
-function Economy.sell(cfg: Settings, data: Data, uids: any): (boolean, any)
+function Economy.sell(cfg: Settings, data: Data, uids: any, eventMult: number?): (boolean, any)
 	if type(uids) ~= "table" or #uids == 0 or #uids > cfg.Economy.SellBatchLimit then
 		return false, "nothing to sell"
 	end
@@ -127,7 +128,7 @@ function Economy.sell(cfg: Settings, data: Data, uids: any): (boolean, any)
 			table.insert(kept, item)
 		end
 	end
-	local gained = math.floor(base * Economy.coinMultiplier(cfg, data) + 1e-9)
+	local gained = math.floor(base * Economy.coinMultiplier(cfg, data, eventMult) + 1e-9)
 	data.parts = kept
 	earn(data, gained)
 	return true, gained
@@ -139,7 +140,7 @@ end
 
 -- Sell every copy of one part at one tier except the `keep` best ones (by total stats). The "sell my duplicates"
 -- button: it keeps your strongest copies for pets and merging.
-function Economy.sellDuplicates(cfg: Settings, data: Data, id: any, tier: any, keep: any): (boolean, any)
+function Economy.sellDuplicates(cfg: Settings, data: Data, id: any, tier: any, keep: any, eventMult: number?): (boolean, any)
 	if type(id) ~= "string" or type(tier) ~= "number" or type(keep) ~= "number" or keep < 0 or keep % 1 ~= 0 then
 		return false, "invalid request"
 	end
@@ -160,12 +161,12 @@ function Economy.sellDuplicates(cfg: Settings, data: Data, id: any, tier: any, k
 	if #uids == 0 then
 		return false, "no spare copies to sell"
 	end
-	return Economy.sell(cfg, data, uids)
+	return Economy.sell(cfg, data, uids, eventMult)
 end
 
 -- Sell the spare copies of every part: in each group (same part, same tier) keep the `keep` best and sell the rest.
 -- One batch, so it is still all or nothing; stops at the batch limit (press it again for the rest).
-function Economy.sellAllSpares(cfg: Settings, data: Data, keep: any): (boolean, any)
+function Economy.sellAllSpares(cfg: Settings, data: Data, keep: any, eventMult: number?): (boolean, any)
 	if type(keep) ~= "number" or keep < 0 or keep % 1 ~= 0 then
 		return false, "invalid request"
 	end
@@ -192,7 +193,7 @@ function Economy.sellAllSpares(cfg: Settings, data: Data, keep: any): (boolean, 
 	if #uids == 0 then
 		return false, "no spare copies to sell"
 	end
-	return Economy.sell(cfg, data, uids)
+	return Economy.sell(cfg, data, uids, eventMult)
 end
 
 -- Sinks --------------------------------------------------------------------------------------------------------------

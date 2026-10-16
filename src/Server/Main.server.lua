@@ -24,12 +24,14 @@ local Run = require(Shared:WaitForChild("Run"))
 local Parts = require(Shared:WaitForChild("Parts"))
 local Crafting = require(Shared:WaitForChild("Crafting"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local Events = require(Shared:WaitForChild("Events"))
 
 local AreaAccess = require(script.Parent:WaitForChild("AreaAccess"))
 local AreaBuilder = require(script.Parent:WaitForChild("AreaBuilder"))
 local ChaserModel = require(script.Parent:WaitForChild("ChaserModel"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
+local EventService = require(script.Parent:WaitForChild("EventService"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local HomeService = require(script.Parent:WaitForChild("HomeService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
@@ -69,6 +71,9 @@ type AreaCtx = {
 	folder: Folder,
 	ox: number,
 	oz: number,
+	model: Model,
+	baseTemplates: { PartSpawner.Template }, -- the area's normal part pool, before any event changes it
+	slot: number,
 }
 
 local function cellLocal(c: { x: number, y: number }): (number, number)
@@ -77,9 +82,12 @@ end
 
 local areaCtxs: { AreaCtx } = {}
 local areaByName: { [string]: AreaCtx } = {}
+local usedSlots: { [number]: boolean } = {}
 local problemCount = 0
 
-for i, def in Config.Areas :: { Areas.Def } do
+-- Builds one area (maze, parts, spawner) at its slot along the world's X axis. The six permanent areas take slots 1-6;
+-- event areas take the next free slot while their event runs.
+local function addArea(def: Areas.Def, slot: number): AreaCtx
 	local maze, layout = Areas.generate(Config, def)
 	local model = AreaBuilder.build(Maze, maze, layout, Config, world, def.name)
 	-- Validate in the area's own coordinates, then move it to its place in the world.
@@ -88,7 +96,7 @@ for i, def in Config.Areas :: { Areas.Def } do
 		warn("[PetPartHunter] " .. def.name .. " validation problems: " .. table.concat(problems, "; "))
 	end
 	problemCount += #problems
-	local ox, oz = AREA_ORIGIN_X + (i - 1) * AREA_SPACING, 0
+	local ox, oz = AREA_ORIGIN_X + (slot - 1) * AREA_SPACING, 0
 	model:TranslateBy(Vector3.new(ox, 0, oz))
 
 	local spawnPoints: { PartSpawner.Point } = {}
@@ -105,6 +113,7 @@ for i, def in Config.Areas :: { Areas.Def } do
 	folder.Name = def.name
 	folder.Parent = partFolder
 
+	local base = Areas.templates(Config, def)
 	local ctx: AreaCtx = {
 		def = def,
 		maze = maze,
@@ -122,18 +131,27 @@ for i, def in Config.Areas :: { Areas.Def } do
 				return Maze.findPath(maze, fx, fy, tx, ty)
 			end,
 		},
-		spawner = PartSpawner.new(Rng.new(def.seed + 2), spawnPoints, Areas.templates(Config, def), def.activeParts, Config.Parts.RespawnSeconds),
+		spawner = PartSpawner.new(Rng.new(def.seed + 2), spawnPoints, base, def.activeParts, Config.Parts.RespawnSeconds),
 		spawnPoints = spawnPoints,
 		zones = zones,
 		visuals = {},
 		folder = folder,
 		ox = ox,
 		oz = oz,
+		model = model,
+		baseTemplates = base,
+		slot = slot,
 	}
 	table.insert(areaCtxs, ctx)
 	areaByName[def.name] = ctx
+	usedSlots[slot] = true
+	workspace:SetAttribute("AreaProblems", problemCount)
+	return ctx
 end
-workspace:SetAttribute("AreaProblems", problemCount)
+
+for i, def in Config.Areas :: { Areas.Def } do
+	addArea(def, i)
+end
 
 -- Shared part spawns -------------------------------------------------------------------------------------------
 -- A stable colour per species (placeholder art until the meshes exist).
@@ -274,7 +292,7 @@ local function chaserSpeed(def: Areas.Def): number
 	if RunService:IsStudio() and type(override) == "number" then
 		return override
 	end
-	return Areas.chaserSpeed(Config, def)
+	return Areas.chaserSpeed(Config, def) * EventService.mods().chaser
 end
 
 local function entranceWorld(ctx: AreaCtx): (number, number)
@@ -284,7 +302,7 @@ end
 
 local function startRun(player: Player, ctx: AreaCtx)
 	local data = PlayerData.get(player)
-	if runs[player] or data == nil or not Areas.canEnter(data, ctx.def.name) then
+	if runs[player] or data == nil or not (ctx.def.event ~= nil or Areas.canEnter(data, ctx.def.name)) then
 		return
 	end
 	local sx, sz = cellLocal(ctx.layout.chaserStart)
@@ -330,6 +348,65 @@ Players.PlayerRemoving:Connect(function(player)
 	enterCooldown[player] = nil
 end)
 
+-- Events (spec section 8) -----------------------------------------------------------------------------------------------
+-- Removes an event area: anyone running it goes back to the lobby, then the maze, parts and portal are cleared.
+local function removeArea(name: string)
+	local ctx = areaByName[name]
+	if ctx == nil then
+		return
+	end
+	for player, pr in runs do
+		if pr.area == ctx then
+			endRun(player)
+			teleport(player, lobby.spawn.X, lobby.spawn.Y, lobby.spawn.Z)
+			notify:FireClient(player, ctx.def.name .. " has closed. Back to the lobby!")
+		end
+	end
+	AreaBuilder.removePortal(lobby.model, name)
+	for i, p in lobby.portals do
+		if p.name == name then
+			table.remove(lobby.portals, i)
+			break
+		end
+	end
+	local at = table.find(areaCtxs, ctx)
+	if at then
+		table.remove(areaCtxs, at)
+	end
+	areaByName[name] = nil
+	usedSlots[ctx.slot] = nil
+	ctx.model:Destroy()
+	ctx.folder:Destroy()
+end
+
+local function nextEventSlot(): number
+	local slot = #Config.Areas + 1
+	while usedSlots[slot] do
+		slot += 1
+	end
+	return slot
+end
+
+-- When events start or stop: build or remove their areas, and re-mix every area's part pool with the event's parts.
+EventService.start(notify, function(active, _mods, started, ended)
+	for _, ev in ended do
+		if ev.area then
+			removeArea(ev.area.name)
+		end
+	end
+	for _, ev in started do
+		local def = Events.areaDef(ev)
+		if def and areaByName[def.name] == nil then
+			local slot = nextEventSlot()
+			addArea(def, slot)
+			table.insert(lobby.portals, AreaBuilder.addPortal(lobby.model, def, slot))
+		end
+	end
+	for _, ctx in areaCtxs do
+		ctx.spawner:setCatalog(Events.templates(ctx.baseTemplates, active, ctx.def.name))
+	end
+end)
+
 -- Main loop ----------------------------------------------------------------------------------------------------
 RunService.Heartbeat:Connect(function(dt)
 	for _, ctx in areaCtxs do
@@ -351,8 +428,9 @@ RunService.Heartbeat:Connect(function(dt)
 				for _, portal in lobby.portals do
 					local dx, dz = p.X - portal.x, p.Z - portal.z
 					if dx * dx + dz * dz <= (portal.radius + 1) ^ 2 and p.Y < 8 then
-						if AreaAccess.check(player, portal.name) then
-							startRun(player, areaByName[portal.name])
+						local target = areaByName[portal.name]
+						if target and (target.def.event ~= nil or AreaAccess.check(player, portal.name)) then
+							startRun(player, target)
 						end
 						break
 					end
@@ -374,6 +452,7 @@ RunService.Heartbeat:Connect(function(dt)
 		for _, e in pr.run:update(dt, px, pz) do
 			if e.type == "caught" then
 				local lost = e.lost or {}
+				Analytics.log(player, "RunCaught", #lost, { area = ctx.def.name })
 				local ex, ez = entranceWorld(ctx)
 				teleport(player, ex, 3, ez)
 				local data = PlayerData.get(player)
@@ -396,10 +475,12 @@ RunService.Heartbeat:Connect(function(dt)
 						-- Bag parts are spawn instances (id "part-N"); the catalog id is Species_Slot.
 						local def = Parts.get(part.species .. "_" .. part.slot)
 						if def then
-							Crafting.addPart(Config, data, def, rollRng, os.time(), Economy.luck(Config, data, os.time()))
+							Crafting.addPart(Config, data, def, rollRng, os.time(), Economy.luck(Config, data, os.time(), EventService.mods().luckAdd))
 						end
 					end
 					CraftService.push(player)
+					EventService.recordParts(player, #parts)
+					Analytics.log(player, "RunEscaped", #parts, { area = ctx.def.name })
 				end
 				enterCooldown[player] = os.clock() + 3
 				endRun(player)

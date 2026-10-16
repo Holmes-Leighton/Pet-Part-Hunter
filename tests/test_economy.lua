@@ -348,4 +348,27 @@ Test.case("every product and pass has what the shop needs", function()
 	end
 end)
 
+Test.case("event boosts: coins multiply what selling pays and luck adds to the roll bias", function()
+	local d = fresh()
+	local items = give(d, "Chicken_Head", 4)
+	local uids = {}
+	for _, it in items do
+		table.insert(uids, it.uid)
+	end
+	local ok, gained = Economy.sell(Config, d, uids, 2)
+	Test.eq(ok, true)
+	Test.eq(gained, 4 * 5 * 2, "double coins event")
+	Test.near(Economy.coinMultiplier(Config, d, 3), 3)
+	d.passes.DoubleCoins = true
+	Test.near(Economy.coinMultiplier(Config, d, 1.5), 3, 1e-9, "pass x2 times event x1.5")
+	Test.eq(Economy.luck(Config, d, 0), 0)
+	Test.eq(Economy.luck(Config, d, 0, 100), 100)
+	Economy.grantProduct(Config, d, "LuckBoost", 0)
+	Test.eq(Economy.luck(Config, d, 10, 50), 150, "boost + event stack")
+	local more = give(d, "Chicken_Head", 2)
+	Test.eq(select(2, Economy.sellDuplicates(Config, d, "Chicken_Head", 1, 1, 2)), 20, "one spare: 5 x event 2 x pass 2")
+	Test.eq(select(2, Economy.sellAllSpares(Config, d, 0, 2)), 20, "the last one, same maths")
+	local _ = more
+end)
+
 Test.done()

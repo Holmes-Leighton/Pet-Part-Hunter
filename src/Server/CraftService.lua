@@ -11,6 +11,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Crafting = require(Shared:WaitForChild("Crafting"))
 local Economy = require(Shared:WaitForChild("Economy"))
+local EventService = require(script.Parent:WaitForChild("EventService"))
 local Parts = require(Shared:WaitForChild("Parts"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 
@@ -77,7 +78,7 @@ function CraftService.push(player: Player)
 		mergeCount = Config.MergeCount,
 		tiers = Config.Tiers,
 		totals = Crafting.equippedStats(Config, data),
-		coinMult = Economy.coinMultiplier(Config, data),
+		coinMult = Economy.coinMultiplier(Config, data, EventService.mods().coins),
 		bagCapacity = Economy.bagCapacity(Config, data),
 		bagCost = Economy.bagUpgradeCost(Config, data.bagUpgrades) or -1, -- -1 = fully upgraded
 		bagBought = data.bagUpgrades,

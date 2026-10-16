@@ -216,4 +216,9 @@ Test.case("community goal: counts together, completes once, shares the reward am
 	Test.eq(Events.addProgress(goal, Events.newGoal(), 1, -3), false)
 end)
 
+Test.case("an event describes itself for banners", function()
+	Test.eq(Events.describe(halloween() :: any), "+100% luck, 2x coins, slower chasers, exclusive parts, Haunted area, community goal")
+	Test.eq(Events.describe({ id = "x", name = "x", start = 0, ["end"] = 1 } :: any), "")
+end)
+
 Test.done()

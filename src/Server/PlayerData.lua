@@ -14,6 +14,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Profile = require(Shared:WaitForChild("Profile"))
+local EventStore = require(script.Parent:WaitForChild("EventStore"))
 
 local PlayerData = {}
 
@@ -116,6 +117,9 @@ function PlayerData.onLoaded(fn: (Player, Profile.Data) -> ())
 end
 
 local function load(player: Player)
+	-- Event parts must be registered before any profile loads, or a saved event part would be dropped and then lost on
+	-- the next save. If the events cannot be read, this player plays on temporary data that is never saved.
+	local eventsReady = EventStore.waitReady(20)
 	local ok, result
 	for attempt = 1, 3 do
 		ok, result = claim(player)
@@ -128,14 +132,17 @@ local function load(player: Player)
 		return
 	end
 	local entry: Entry
-	if ok then
+	if ok and not eventsReady then
+		warn("[PetPartHunter] events not loaded; " .. player.Name .. " plays on temporary data this session")
+		entry = { data = Profile.load(nil, Config), persistent = false }
+	elseif ok then
 		entry = { data = Profile.load(result, Config), persistent = true }
 	elseif result == "locked" then
 		player:Kick("Your data is in use on another server. Please rejoin in a moment.")
 		return
 	else
 		warn("[PetPartHunter] could not load data for " .. player.Name .. " (" .. tostring(result) .. "); using temporary data")
-		entry = { data = Profile.default(Config.Data.SchemaVersion), persistent = false }
+		entry = { data = Profile.load(nil, Config), persistent = false } -- includes the free areas, unlike Profile.default
 	end
 	entries[player] = entry
 	player:SetAttribute("DataPersistent", entry.persistent)

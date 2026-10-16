@@ -18,6 +18,7 @@ local Speed = require(Shared:WaitForChild("Speed"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local AreaAccess = require(script.Parent:WaitForChild("AreaAccess"))
+local EventService = require(script.Parent:WaitForChild("EventService"))
 
 local Progression = {}
 
@@ -28,7 +29,7 @@ export type Pad = { tier: number, x: number, z: number, radius: number }
 -- Sets the attributes the HUD reads. Only values that changed cause a replication.
 -- Equipped pets add their speed bonus (a percentage) to every Speed gain.
 local function petMultiplier(data: Profile.Data): number
-	return 1 + Crafting.equippedStats(Config, data).speed / 100
+	return (1 + Crafting.equippedStats(Config, data).speed / 100) * EventService.mods().speed
 end
 
 local function publish(player: Player, data: Profile.Data)

@@ -130,6 +130,7 @@ local Config = {
 	-- saved, the trade does not happen.
 	Backend = {
 		TradeStore = "PetPartHunterTradeLog_v1",
+		EventStore = "PetPartHunterEvents_v1", -- events are data records stored here, edited from the admin panel
 		MaxIndexPerPlayer = 200, -- recent trades remembered per player in the index
 		SaveRetries = 3,
 		TradeLogUrl = "", -- your backend endpoint; empty = DataStore only. Needs HttpService enabled

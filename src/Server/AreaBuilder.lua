@@ -110,7 +110,7 @@ local AREA_COLORS: { [string]: Color3 } = {
 
 export type Portal = { name: string, x: number, z: number, radius: number }
 
-function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, portals: { Portal } }
+function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, portals: { Portal }, model: Model }
 	local model = Instance.new("Model")
 	model.Name = "Lobby"
 	model.Parent = parent
@@ -129,16 +129,36 @@ function AreaBuilder.buildLobby(cfg: any, parent: Instance): { spawn: Vector3, p
 
 	local portals: { Portal } = {}
 	for i, def in cfg.Areas do
-		local x, z = -75 + (i - 1) * 10, 64
-		local color = AREA_COLORS[def.name] or Color3.new(1, 1, 1)
-		local p = pad("Enter" .. def.name, x, z, 4, color, model)
-		local locked = def.unlockRebirths ~= nil or def.pass ~= nil
-		label(p, string.upper(def.name) .. (if def.unlockRebirths then "\nRebirth " .. def.unlockRebirths .. " / pass" else ""), color)
-		p:SetAttribute("Area", def.name)
-		p:SetAttribute("Locked", locked)
-		table.insert(portals, { name = def.name, x = x, z = z, radius = 4 })
+		table.insert(portals, AreaBuilder.addPortal(model, def, i))
 	end
-	return { spawn = spawn.Position + Vector3.new(0, 3, 0), portals = portals }
+	return { spawn = spawn.Position + Vector3.new(0, 3, 0), portals = portals, model = model }
+end
+
+-- One portal pad in the lobby. The six permanent areas fill the front row; event areas go in the row behind it.
+function AreaBuilder.addPortal(lobbyModel: Instance, def: any, index: number): Portal
+	local col = (index - 1) % 6
+	local row = math.floor((index - 1) / 6)
+	local x, z = -75 + col * 10, 64 - row * 9
+	local color = AREA_COLORS[def.name] or Color3.fromRGB(255, 140, 40)
+	local p = pad("Enter" .. def.name, x, z, 4, color, lobbyModel)
+	local locked = def.unlockRebirths ~= nil or def.pass ~= nil
+	local text = string.upper(def.name)
+	if def.event then
+		text ..= "\nEVENT"
+	elseif def.unlockRebirths then
+		text ..= "\nRebirth " .. def.unlockRebirths .. " / pass"
+	end
+	label(p, text, color)
+	p:SetAttribute("Area", def.name)
+	p:SetAttribute("Locked", locked)
+	return { name = def.name, x = x, z = z, radius = 4 }
+end
+
+function AreaBuilder.removePortal(lobbyModel: Instance, name: string)
+	local p = lobbyModel:FindFirstChild("Enter" .. name)
+	if p then
+		p:Destroy()
+	end
 end
 
 -- Running pads in the lobby: one per tier in a row. Standing on one trains Speed (the server does the counting).

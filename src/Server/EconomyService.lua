@@ -19,6 +19,7 @@ local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local Announcer = require(script.Parent:WaitForChild("Announcer"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
+local EventService = require(script.Parent:WaitForChild("EventService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 
 local EconomyService = {}
@@ -65,7 +66,7 @@ function EconomyService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 			return
 		end
 		if action == "Sell" then
-			local ok, result = Economy.sell(Config, data, a)
+			local ok, result = Economy.sell(Config, data, a, EventService.mods().coins)
 			if ok then
 				Analytics.log(player, "CoinsEarned", result, { source = "SellParts" })
 				tell(player, string.format("Sold for %d coins!", result))
@@ -73,7 +74,7 @@ function EconomyService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 				tell(player, "Cannot sell: " .. tostring(result))
 			end
 		elseif action == "SellDuplicates" then
-			local ok, result = Economy.sellDuplicates(Config, data, a, b, c)
+			local ok, result = Economy.sellDuplicates(Config, data, a, b, c, EventService.mods().coins)
 			if ok then
 				Analytics.log(player, "CoinsEarned", result, { source = "SellDuplicates" })
 				tell(player, string.format("Sold duplicates for %d coins!", result))
@@ -81,7 +82,7 @@ function EconomyService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 				tell(player, "Cannot sell: " .. tostring(result))
 			end
 		elseif action == "SellAllSpares" then
-			local ok, result = Economy.sellAllSpares(Config, data, 1)
+			local ok, result = Economy.sellAllSpares(Config, data, 1, EventService.mods().coins)
 			if ok then
 				Analytics.log(player, "CoinsEarned", result, { source = "SellSpares" })
 				tell(player, string.format("Sold your spares for %d coins!", result))
