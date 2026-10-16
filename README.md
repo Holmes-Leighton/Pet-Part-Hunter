@@ -16,7 +16,8 @@ See [docs/GAME_DESIGN_SPEC.md](docs/GAME_DESIGN_SPEC.md) for the full design spe
 | 6. Home building (plot, starter room, furniture shop, placement ghost, move/rotate/delete, visitors, pets wandering) | Done |
 | 7. Economy: selling parts, bag upgrades, pet slots, passes, Robux products (coin packs, luck boost, insurance), receipt handling, purchase announcements, everyone sees everyone's pets | Done (pass and product IDs in Config are 0 until you create them on Roblox) |
 | 8. Trading: two-sided window (lock, countdown, confirm), eligibility, cooldown, lopsided warning, atomic swap, backend trade log | Done |
-| 9. Admin panel, events system, external dashboard | Next |
+| 9. Admin panel, events system, monitoring and anti-exploit, dashboard feed | Done |
+| 10. Closed test on phones, tune from the monitoring data, launch | Next (needs real devices and players) |
 ## Running
 
 - Pure-logic tests: `python tests/run_tests.py` (set `LUAU` and `LUAU_ANALYZE` to the luau tool paths if they are not on PATH).
@@ -40,3 +41,25 @@ Every trade window that ends is recorded: completed, cancelled, expired and fail
   is dropped; a completed record = the trade happened, so that player's side is applied now (if not already). It is idempotent, each player
   recovers independently, and the tests simulate a crash at every step. Until it is settled the player cannot start another trade.
 - **Reading it:** `TradeLogger.history(userId)`, `TradeLogger.get(key)` and `TradeLogger.recent()` for the admin panel. The record shape is `Shared/TradeLog` (tested).
+
+## Events, admin tools and monitoring (build step 9)
+
+**Events** are data, not code (`Shared/Events`, `Server/EventStore`, `Server/EventService`). An admin creates one in the panel (presets for the spec's event types, or
+paste a JSON record); it is validated, stored in a DataStore and picked up by every server (refresh timer plus MessagingService). One record can carry modifiers
+(luck, coins, speed gain, chaser speed), exclusive parts, a whole event area (a new maze with its own chaser, built while the event runs), a community goal, or a
+chaos effect. Event parts are registered before any profile loads and stay registered after the event ends, so saved event parts are never lost; events that have
+exclusive parts can be stopped but not deleted. Event parts are non-tradable unless the event says otherwise.
+
+**Admin** (`Shared/Admin`, `Server/AdminService`): set `Config.Admin.Owners / Admins / Mods` (user ids) and/or `GroupId` with `GroupRanks`. In Studio the tester is an owner
+(`StudioIsOwner`, never on live servers). Every command is checked on the server (role, validated arguments, a written reason for destructive actions), is written to the
+audit log **before** it runs (no record, no action), and denied attempts are logged. Players, coins and parts, kick/ban (reaches all servers), snapshots and rollback,
+live tuning (chaser speed, respawn rate, trade switch, per-area chaser and open/closed), events, announcements, metrics and exploit flags. Inventory commands need the target online.
+Rolling back keeps trade journals, purchase receipts and passes; anything else earned after the snapshot is undone (the audit log shows what).
+
+**Monitoring and anti-exploit** (`Shared/Metrics`, `Shared/ExploitCheck`, `Server/MetricsService`, `Server/AntiExploit`, `Server/Alerts`):
+- Every `Analytics.log` also feeds the counters. Once a minute a snapshot is posted to `Config.Backend.MetricsUrl` as JSON
+  `{ v, t, job, seconds, events = { "RunEscaped|area=Rare" = { n, sum }, ... }, gauges = { players, perArea, fps, budgets, uptime } }`.
+  Chart in Grafana or similar: catch vs escape per area, `CoinsEarned` vs `CoinsSpent`, purchases, rebirths, session length (`SessionSeconds` sum / count), DataStore errors.
+- Exploit checks: impossible speed and teleports, hauls over bag capacity or huge, duplicated item ids, unusual trade volume. They log (DataStore list per day, plus the
+  admin panel) and alert; they never kick on their own. Serious ones, or repeats, go to `Config.Backend.AlertUrl` (point it at a small relay; Discord often blocks Roblox).
+- Set the API key as a Roblox secret named `Config.Backend.SecretName`. With no URLs set, nothing leaves the server and the in-game numbers still work.

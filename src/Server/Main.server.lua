@@ -33,6 +33,8 @@ local CraftService = require(script.Parent:WaitForChild("CraftService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
 local EventService = require(script.Parent:WaitForChild("EventService"))
 local AdminService = require(script.Parent:WaitForChild("AdminService"))
+local AntiExploit = require(script.Parent:WaitForChild("AntiExploit"))
+local MetricsService = require(script.Parent:WaitForChild("MetricsService"))
 local BanService = require(script.Parent:WaitForChild("BanService"))
 local SnapshotService = require(script.Parent:WaitForChild("SnapshotService"))
 local TuningService = require(script.Parent:WaitForChild("TuningService"))
@@ -238,6 +240,7 @@ end
 local function teleport(player: Player, x: number, y: number, z: number)
 	local char = player.Character
 	if char then
+		AntiExploit.expect(player) -- a move the server ordered, not a teleport hack
 		char:PivotTo(CFrame.new(x, y, z))
 	end
 end
@@ -354,6 +357,8 @@ end)
 
 -- Admin tools (spec section 8): roles, commands, bans, snapshots and live tuning. Settings changed in the panel apply
 -- straight away; the part respawn rate is the one that needs pushing into the spawners.
+MetricsService.start()
+AntiExploit.start()
 TuningService.start()
 TuningService.onChanged(function()
 	for _, ctx in areaCtxs do
@@ -490,6 +495,7 @@ RunService.Heartbeat:Connect(function(dt)
 			elseif e.type == "escaped" then
 				local parts = e.parts or {}
 				local data = PlayerData.get(player)
+				AntiExploit.checkHaul(player, #parts, if data then Economy.bagCapacity(Config, data) else 999)
 				if data then
 					for _, part in parts do
 						-- Bag parts are spawn instances (id "part-N"); the catalog id is Species_Slot.

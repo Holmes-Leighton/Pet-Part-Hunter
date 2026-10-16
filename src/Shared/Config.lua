@@ -135,6 +135,7 @@ local Config = {
 		BanStore = "PetPartHunterBans_v1",
 		SnapshotStore = "PetPartHunterSnapshots_v1", -- recent copies of each player's data, for rollbacks
 		TuningStore = "PetPartHunterTuning_v1", -- live settings changed from the admin panel
+		ExploitStore = "PetPartHunterExploits_v1", -- suspicious events, one list per day
 		AuditLogUrl = "", -- optional: also POST every audit entry to your backend (same secret as the trade log)
 		MetricsUrl = "", -- optional: your monitoring backend; batched metrics are POSTed here every minute
 		AlertUrl = "", -- optional: relay for serious events (Discord often blocks Roblox, so point this at a small relay)
@@ -160,6 +161,27 @@ local Config = {
 		SnapshotMinutes = 10, -- how often a connected player's data is snapshotted
 		AuditMaxPerDay = 2000,
 		RateLimit = { perSecond = 3, burst = 10 },
+	},
+
+	-- Exploit detection (spec section 9). Checks log and alert; they never kick on their own.
+	Exploit = {
+		SampleSeconds = 0.5, -- how often positions are sampled
+		SpeedTolerance = 1.5, -- allowed multiple of the player's server-set WalkSpeed
+		SpeedSlack = 8, -- extra studs/s allowed on top (jumps, slopes)
+		TeleportMinDistance = 40, -- studs in one sample before a jump counts as a teleport
+		TeleportGraceSeconds = 2, -- after a server-ordered teleport the baseline resets
+		HugeHaul = 15, -- escaping with this many parts at once is flagged even if the bag allows it
+		StrikeWindow = 60, -- seconds over which repeat violations are counted
+		AlertStrikes = 3, -- repeats inside the window before a minor violation alerts
+		MaxLogPerDay = 3000,
+		DuplicateCheckSeconds = 60, -- how often connected players' data is checked for duplicated items
+	},
+
+	-- Monitoring (spec section 9): batches of counters and gauges are posted to Backend.MetricsUrl at this interval.
+	Monitoring = {
+		FlushSeconds = 60,
+		KeepSnapshots = 60, -- recent snapshots kept in memory (an hour) for the admin panel
+		AlertCooldownSeconds = 30, -- the same kind of alert is sent at most this often
 	},
 
 	-- Pets shown in the world (client side). Every player's equipped pets are visible to everyone, following their owner

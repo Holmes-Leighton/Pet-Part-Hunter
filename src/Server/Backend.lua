@@ -28,6 +28,9 @@ function Backend.store(name: string): DataStore?
 	return s
 end
 
+-- Set by MetricsService so a DataStore failure shows up on the dashboard (spec section 9: "DataStore errors").
+Backend.errorHook = nil :: ((string) -> ())?
+
 -- Runs fn up to `tries` times with a growing pause. Returns whether it worked, and what it returned.
 function Backend.retry(tries: number, fn: () -> any): (boolean, any)
 	local lastErr: any = nil
@@ -40,6 +43,9 @@ function Backend.retry(tries: number, fn: () -> any): (boolean, any)
 		if attempt < tries then
 			task.wait(attempt)
 		end
+	end
+	if Backend.errorHook then
+		Backend.errorHook(tostring(lastErr))
 	end
 	return false, lastErr
 end

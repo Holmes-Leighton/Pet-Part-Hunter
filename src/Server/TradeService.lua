@@ -24,6 +24,7 @@ local TradeLog = require(Shared:WaitForChild("TradeLog"))
 local Recovery = require(Shared:WaitForChild("TradeRecovery"))
 
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local AntiExploit = require(script.Parent:WaitForChild("AntiExploit"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local TradeLogger = require(script.Parent:WaitForChild("TradeLogger"))
@@ -261,6 +262,15 @@ local function complete(active: Active)
 		active.executing = false
 		closeTrade(active, "failed", "trading is temporarily unavailable, nothing was traded")
 		return
+	end
+
+	-- Unusual trade volume goes to the exploit log too (spec section 9), so it is reviewed alongside everything else.
+	for _, flag in flags do
+		local volumeUser = string.match(flag, "^volume_(%d+)$")
+		if volumeUser then
+			local p = Players:GetPlayerByUserId(tonumber(volumeUser) :: number)
+			AntiExploit.flagUser(tonumber(volumeUser) :: number, if p then p.Name else volumeUser, "trade_volume", "more than " .. Config.Trade.VolumePerHour .. " trades in an hour", 2)
+		end
 	end
 
 	-- The log wait yielded: re-fetch the data and re-check before moving anything.

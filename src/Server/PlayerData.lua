@@ -15,6 +15,7 @@ local Shared = ReplicatedStorage:WaitForChild("Shared")
 local Config = require(Shared:WaitForChild("Config"))
 local Profile = require(Shared:WaitForChild("Profile"))
 local EventStore = require(script.Parent:WaitForChild("EventStore"))
+local MetricsService = require(script.Parent:WaitForChild("MetricsService"))
 
 local PlayerData = {}
 
@@ -85,6 +86,7 @@ local function write(player: Player, entry: Entry, release: boolean): boolean
 	end)
 	if not ok then
 		warn("[PetPartHunter] save failed for " .. player.Name .. ": " .. tostring(err))
+		MetricsService.record("DataStoreError", 1, { kind = "profile_save" })
 	end
 	return ok
 end
@@ -142,6 +144,7 @@ local function load(player: Player)
 		return
 	else
 		warn("[PetPartHunter] could not load data for " .. player.Name .. " (" .. tostring(result) .. "); using temporary data")
+		MetricsService.record("DataStoreError", 1, { kind = "profile_load" })
 		entry = { data = Profile.load(nil, Config), persistent = false } -- includes the free areas, unlike Profile.default
 	end
 	entries[player] = entry

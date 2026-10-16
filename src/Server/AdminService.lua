@@ -22,7 +22,9 @@ local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local Rng = require(Shared:WaitForChild("Rng"))
 
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local AntiExploit = require(script.Parent:WaitForChild("AntiExploit"))
 local AuditLogger = require(script.Parent:WaitForChild("AuditLogger"))
+local MetricsService = require(script.Parent:WaitForChild("MetricsService"))
 local BanService = require(script.Parent:WaitForChild("BanService"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
 local EconomyService = require(script.Parent:WaitForChild("EconomyService"))
@@ -50,7 +52,7 @@ local lastDenied: { [Player]: number } = {}
 local grantRng = Rng.new(os.time() + 7)
 
 -- Commands that only read; everything else must be logged before it runs.
-local READ_ONLY: { [string]: boolean } = { players = true, inspect = true, audit = true, event_list = true, tuning_get = true, snapshots = true, trades = true }
+local READ_ONLY: { [string]: boolean } = { metrics = true, exploits = true, players = true, inspect = true, audit = true, event_list = true, tuning_get = true, snapshots = true, trades = true }
 
 local function roleOf(player: Player): Admin.Role
 	return roles[player] or "none"
@@ -278,6 +280,14 @@ end
 handlers.event_delete = function(_, a)
 	local ok, why = EventStore.remove(a.id)
 	return ok, if ok then "event deleted" else why
+end
+
+handlers.metrics = function()
+	return true, "last hour on this server", MetricsService.summary()
+end
+
+handlers.exploits = function()
+	return true, "recent exploit flags on this server", AntiExploit.recent(60)
 end
 
 handlers.tuning_get = function()

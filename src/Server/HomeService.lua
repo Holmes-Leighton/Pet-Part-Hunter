@@ -18,6 +18,7 @@ local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 
 local PlayerData = require(script.Parent:WaitForChild("PlayerData"))
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
+local AntiExploit = require(script.Parent:WaitForChild("AntiExploit"))
 
 local HomeService = {}
 
@@ -218,6 +219,7 @@ end
 local function teleportInto(player: Player, plot: Plot)
 	local char = player.Character
 	if char then
+		AntiExploit.expect(player)
 		local door = H.Door
 		char:PivotTo(CFrame.new(plot.ox + (door.start + door.width / 2) * CELL, 3.5, plot.oz + ROOM_D - (door.clearance + 1) * CELL))
 	end
@@ -297,6 +299,7 @@ function HomeService.start(inRun: (Player) -> boolean, notify: RemoteEvent, lobb
 			return
 		elseif action == "Lobby" then
 			if player.Character then
+				AntiExploit.expect(player)
 				player.Character:PivotTo(CFrame.new(lobbySpawn))
 			end
 			return

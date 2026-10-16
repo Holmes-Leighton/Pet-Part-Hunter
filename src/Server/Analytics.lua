@@ -5,10 +5,13 @@
 local AnalyticsService = game:GetService("AnalyticsService")
 local RunService = game:GetService("RunService")
 
+local MetricsService = require(script.Parent:WaitForChild("MetricsService"))
+
 local Analytics = {}
 
 -- Logs a custom event, e.g. Analytics.log(player, "Rebirth", 3, { Speed = 4050 }).
 function Analytics.log(player: Player, name: string, value: number?, fields: { [string]: any }?)
+	MetricsService.record(name, value, fields) -- every analytics event also feeds the monitoring counters
 	if RunService:IsStudio() then
 		print(string.format("[Analytics] %s %s value=%s", player.Name, name, tostring(value)))
 	end

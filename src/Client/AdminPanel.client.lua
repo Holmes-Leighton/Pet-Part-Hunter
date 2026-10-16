@@ -345,6 +345,47 @@ local function showAudit()
 	end)
 end
 
+local function showMetrics()
+	clear()
+	UiKit.row(list, "Last hour on this server", "REFRESH", BLUE, function()
+		show("Metrics")
+	end)
+	call("metrics", {}, function(ok, _, m)
+		if not ok or type(m) ~= "table" then
+			return
+		end
+		line(string.format("Covers %d minute(s). Runs: %d escaped, %d caught. Parts banked: %d", m.minutes, m.runsEscaped, m.runsCaught, m.partsBanked))
+		for area, rate in m.catchRates do
+			line(string.format("Catch rate in %s: %d%%", area, math.floor(rate * 100)))
+		end
+		line(string.format("Coins: %d earned, %d spent, balance %d", m.coinsEarned, m.coinsSpent, m.coinBalance))
+		line(string.format("Trades %d, rebirths %d, purchases %d", m.trades, m.rebirths, m.purchases))
+		line(string.format("Exploit flags %d, DataStore errors %d", m.exploitFlags, m.dataStoreErrors))
+		local g = m.gauges
+		if type(g) == "table" then
+			line(string.format("Players %s, server fps %s", tostring(g.players), tostring(g.fps)))
+		end
+	end)
+end
+
+local function showExploits()
+	clear()
+	call("exploits", {}, function(ok, _, data)
+		if not ok or type(data) ~= "table" then
+			return
+		end
+		for _, e in data do
+			UiKit.row(list, string.format("%s  %s (%d)  %s sev %d  %s", timeText(e.t), e.name, e.userId, e.kind, e.severity, e.detail), "SELECT", ORANGE, function()
+				selected = { userId = e.userId, name = e.name }
+				show("Players")
+			end)
+		end
+		if #data == 0 then
+			line("No exploit flags on this server.")
+		end
+	end)
+end
+
 local function showAnnounce()
 	clear()
 	local text = inputRow("Message", "shown to every player")
@@ -358,6 +399,8 @@ local TABS: { { name: string, draw: () -> () } } = {
 	{ name = "Events", draw = showEvents },
 	{ name = "Tuning", draw = showTuning },
 	{ name = "Audit", draw = showAudit },
+	{ name = "Metrics", draw = showMetrics },
+	{ name = "Exploits", draw = showExploits },
 	{ name = "Announce", draw = showAnnounce },
 }
 local current = "Players"
