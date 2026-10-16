@@ -4,3 +4,6 @@
 *.rbxlx.lock
 sourcemap.json
 __pycache__/
+
+# Reference screenshots
+ss*.webp
