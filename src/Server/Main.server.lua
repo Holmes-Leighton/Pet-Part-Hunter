@@ -199,6 +199,16 @@ local function endRun(player: Player)
 	setHud(player, nil)
 end
 
+-- Chaser speed for new runs. In Studio only, the DebugChaserSpeed workspace attribute overrides it so playtests
+-- can freeze the chaser (0) or speed it up without editing code.
+local function chaserSpeed(): number
+	local override = workspace:GetAttribute("DebugChaserSpeed")
+	if RunService:IsStudio() and type(override) == "number" then
+		return override
+	end
+	return Config.Player.WalkSpeed * Config.Chase.SpeedMultiplier[AREA]
+end
+
 local function startRun(player: Player)
 	if runs[player] then
 		return
@@ -207,7 +217,7 @@ local function startRun(player: Player)
 	local sx, sz = cellWorld(layout.chaserStart)
 	local run = Run.new({
 		bag = Bag.new(Config.Bag.StartCapacity),
-		chaser = Chaser.new(grid, sx, sz, Config.Player.WalkSpeed * Config.Chase.SpeedMultiplier[AREA]),
+		chaser = Chaser.new(grid, sx, sz, chaserSpeed()),
 		spawner = spawner,
 		timer = EscapeTimer.new(Config.Escape.HoldSeconds),
 	}, (function()
