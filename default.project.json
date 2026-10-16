@@ -1,0 +1,27 @@
+{
+  "name": "PetPartHunter",
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "PetPartHunter": {
+        "$path": "src/Server"
+      }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": {
+        "$path": "src/Shared"
+      }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "PetPartHunter": {
+          "$path": "src/Client"
+        }
+      }
+    }
+  }
+}
