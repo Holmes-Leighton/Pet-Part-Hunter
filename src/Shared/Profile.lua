@@ -5,6 +5,7 @@
 local Areas = require("./Areas")
 local Crafting = require("./Crafting")
 local Economy = require("./Economy")
+local TradeRecovery = require("./TradeRecovery")
 local House = require("./House")
 local Parts = require("./Parts")
 local Speed = require("./Speed")
@@ -31,6 +32,7 @@ export type Data = {
 	luckUntil: number, -- epoch seconds a luck boost runs until
 	receipts: { string }, -- recent purchase receipts (never grant one twice)
 	stats: { coinsEarned: number, coinsSpent: number }, -- lifetime totals, for monitoring the economy
+	tradeJournal: TradeRecovery.Journal, -- pending / applied trades, so a crash mid-trade heals itself
 	furniture: { [string]: number }, -- owned furniture not placed in the house
 	house: House.HouseData, -- placed layout and visitor list
 }
@@ -58,6 +60,7 @@ function Profile.default(version: number, startSlots: number?): Data
 		luckUntil = 0,
 		receipts = {},
 		stats = { coinsEarned = 0, coinsSpent = 0 },
+		tradeJournal = { pending = {}, applied = {} },
 		furniture = {},
 		house = { version = 1, items = {}, allow = {} },
 	}
@@ -167,6 +170,22 @@ function Profile.load(raw: any, cfg: Settings): Data
 	if type(raw.stats) == "table" then
 		out.stats.coinsEarned = nonNegative(raw.stats.coinsEarned, 0)
 		out.stats.coinsSpent = nonNegative(raw.stats.coinsSpent, 0)
+	end
+	if type(raw.tradeJournal) == "table" then
+		if type(raw.tradeJournal.pending) == "table" then
+			for _, p in raw.tradeJournal.pending do
+				if type(p) == "table" and type(p.id) == "string" and type(p.key) == "string" and #p.id <= 96 and #p.key <= 128 and #out.tradeJournal.pending < 20 then
+					table.insert(out.tradeJournal.pending, { id = p.id, key = p.key })
+				end
+			end
+		end
+		if type(raw.tradeJournal.applied) == "table" then
+			for _, id in raw.tradeJournal.applied do
+				if type(id) == "string" and #id <= 96 and #out.tradeJournal.applied < 50 then
+					table.insert(out.tradeJournal.applied, id)
+				end
+			end
+		end
 	end
 	out.petSlots = math.clamp(whole(raw.petSlots, cfg.Pets.StartSlots, cfg.Pets.MaxSlots), cfg.Pets.StartSlots, cfg.Pets.MaxSlots)
 	if type(raw.equippedPets) == "table" then

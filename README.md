@@ -34,4 +34,9 @@ Every trade window that ends is recorded: completed, cancelled, expired and fail
 - **Your own backend (optional):** set `Config.Backend.TradeLogUrl`, enable HttpService, and store the API key as a Roblox secret named `Config.Backend.SecretName`.
   Records are POSTed as JSON with retries in the background.
 - **Server output:** one summary line per trade, a warning when flagged (`lopsided`, `volume_<userId>`).
+- **Crash recovery (automatic):** a trade moves items between two profiles that are saved separately, so each profile carries a journal
+  (`Shared/TradeRecovery`). Order: mark the trade pending in both and save, write the record (the commit point), swap, mark applied and save.
+  When a profile loads with a pending trade the server reads the record: none, or a later `_f` record = the trade never happened, so the note
+  is dropped; a completed record = the trade happened, so that player's side is applied now (if not already). It is idempotent, each player
+  recovers independently, and the tests simulate a crash at every step. Until it is settled the player cannot start another trade.
 - **Reading it:** `TradeLogger.history(userId)`, `TradeLogger.get(key)` and `TradeLogger.recent()` for the admin panel. The record shape is `Shared/TradeLog` (tested).

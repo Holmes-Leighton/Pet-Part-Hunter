@@ -21,6 +21,7 @@ local Profile = require(Shared:WaitForChild("Profile"))
 local RateLimiter = require(Shared:WaitForChild("RateLimiter"))
 local Trade = require(Shared:WaitForChild("Trade"))
 local TradeLog = require(Shared:WaitForChild("TradeLog"))
+local Recovery = require(Shared:WaitForChild("TradeRecovery"))
 
 local Analytics = require(script.Parent:WaitForChild("Analytics"))
 local CraftService = require(script.Parent:WaitForChild("CraftService"))
@@ -50,6 +51,7 @@ local inRunCheck: (Player) -> boolean = function()
 end
 local notifyRemote: RemoteEvent? = nil
 local counter = 0
+local recovering: { [Player]: boolean } = {} -- players whose interrupted trades are still being finished
 
 local function tell(player: Player, text: string)
 	if notifyRemote then
@@ -232,35 +234,69 @@ local function complete(active: Active)
 	preview.state = "completed"
 	preview.reason = "completed"
 	local record = TradeLog.build(preview, gave, ev, active.startedEpoch, os.time(), game.JobId, flags)
+	local key = TradeLog.key(record)
+
+	-- Step 1: a durable note of intent in both profiles. If the server dies from here on, the next load of either
+	-- profile finds this note and finishes or drops the trade by itself (Shared/TradeRecovery).
+	local pa, pb = Players:GetPlayerByUserId(s.a.userId), Players:GetPlayerByUserId(s.b.userId)
+	if pa == nil or pb == nil then
+		active.executing = false
+		closeTrade(active, "failed", "a player left")
+		return
+	end
+	Recovery.begin(datas[s.a.userId], s.id, key)
+	Recovery.begin(datas[s.b.userId], s.id, key)
+	if not (PlayerData.saveNow(pa) and PlayerData.saveNow(pb)) then
+		Recovery.discard(datas[s.a.userId], s.id)
+		Recovery.discard(datas[s.b.userId], s.id)
+		active.executing = false
+		closeTrade(active, "failed", "could not save, nothing was traded")
+		return
+	end
+
+	-- Step 2: the commit point. Once this record exists, the trade has happened as far as recovery is concerned.
 	if not TradeLogger.write(record) then
+		Recovery.discard(datas[s.a.userId], s.id)
+		Recovery.discard(datas[s.b.userId], s.id)
 		active.executing = false
 		closeTrade(active, "failed", "trading is temporarily unavailable, nothing was traded")
 		return
 	end
 
 	-- The log wait yielded: re-fetch the data and re-check before moving anything.
-	local fresh = datasFor(s)
-	if fresh == nil or s.state ~= "open" then
-		active.executing = false
+	-- A "failed" record with the same time and the id + "_f" supersedes the completed one: recovery reads it and
+	-- drops the pending note instead of finishing the trade.
+	local function supersede(reason: string)
 		local failed = table.clone(record)
 		failed.id = record.id .. "_f"
 		failed.status = "failed"
-		failed.reason = "a player left before the swap; supersedes " .. record.id
+		failed.reason = reason .. "; supersedes " .. record.id
 		TradeLogger.write(failed)
+		for _, party in { s.a, s.b } do
+			local p = Players:GetPlayerByUserId(party.userId)
+			local d = if p then PlayerData.get(p) else nil
+			if d then
+				Recovery.discard(d, s.id)
+			end
+		end
+	end
+	local fresh = datasFor(s)
+	if fresh == nil or s.state ~= "open" then
+		active.executing = false
+		supersede("a player left before the swap")
 		closeTrade(active, "failed", "a player left before the swap")
 		return
 	end
 	local ok, why = Trade.execute(Config, s, fresh, os.clock())
 	if not ok then
 		active.executing = false
-		local failed = table.clone(record)
-		failed.id = record.id .. "_f"
-		failed.status = "failed"
-		failed.reason = "swap rejected: " .. why .. "; supersedes " .. record.id
-		TradeLogger.write(failed)
+		supersede("swap rejected: " .. why)
 		closeTrade(active, "failed", why)
 		return
 	end
+	-- Step 3: both profiles now show the trade as applied (and no longer pending); save them straight away.
+	Recovery.settle(fresh[s.a.userId], s.id)
+	Recovery.settle(fresh[s.b.userId], s.id)
 
 	-- Done. Cooldowns, volume tracking, saving, and telling everyone.
 	for _, party in { s.a, s.b } do
@@ -288,12 +324,70 @@ local function eligibility(player: Player): (boolean, string)
 	if data == nil then
 		return false, "your data is still loading"
 	end
+	if recovering[player] then
+		return false, "an interrupted trade is being finished, try again in a moment"
+	end
 	return Trade.eligible(Config, player.AccountAge, Profile.level(Config.Speed, data))
+end
+
+-- Crash recovery -----------------------------------------------------------------------------------------------------
+-- A profile that loads with a pending trade was left mid-trade by a server crash (or a player leaving mid-swap). The
+-- trade record is the commit point: no completed record means the trade never happened, so the note is dropped; a
+-- completed record that was not superseded means it did, so this player's side is applied now. Idempotent and
+-- independent per player (see Shared/TradeRecovery). Until it is settled the player cannot start a new trade.
+local function recoverPlayer(player: Player, data: any)
+	if #Recovery.pending(data) == 0 then
+		return
+	end
+	recovering[player] = true
+	task.spawn(function()
+		for attempt = 1, 20 do
+			local unresolved, changed, finished = false, false, false
+			for _, entry in Recovery.pending(data) do
+				local rec, ok = TradeLogger.get(entry.key)
+				if not ok then
+					unresolved = true -- could not read the log: never guess, try again later
+				elseif rec == nil or not Recovery.isCommitted(rec) then
+					Recovery.discard(data, entry.id) -- never committed: nothing to do
+					changed = true
+				else
+					local superseded, ok2 = TradeLogger.get(TradeLog.supersededKey(rec))
+					if not ok2 then
+						unresolved = true
+					elseif superseded ~= nil then
+						Recovery.discard(data, entry.id) -- committed, then the swap was rejected: it never happened
+						changed = true
+					else
+						local result = Recovery.recover(data, rec, player.UserId, os.time())
+						warn(string.format("[PetPartHunter] trade %s recovered for %s: %s", entry.id, player.Name, result))
+						Analytics.log(player, "TradeRecovered", 1, { trade = entry.id })
+						changed, finished = true, true
+					end
+				end
+			end
+			if changed then
+				PlayerData.saveNow(player)
+				CraftService.push(player)
+			end
+			if finished then
+				tell(player, "A trade that was interrupted by a server problem has now been completed.")
+			end
+			if not unresolved or player.Parent == nil then
+				break
+			end
+			task.wait(30)
+		end
+		recovering[player] = nil
+	end)
 end
 
 function TradeService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 	inRunCheck = inRun
 	notifyRemote = notify
+
+	PlayerData.onLoaded(function(player, data)
+		recoverPlayer(player, data)
+	end)
 
 	local function dropInvitesOf(player: Player)
 		invites[player] = nil
@@ -326,7 +420,7 @@ function TradeService.start(inRun: (Player) -> boolean, notify: RemoteEvent)
 					if Trade.expired(Config, active.session, now) and not active.executing then
 						closeTrade(active, "expired", "no activity")
 					else
-						-- Keeps the "confirm in 3, 2, 1" countdown moving on the clients.
+						-- Keeps the confirm countdown moving on the clients.
 						if Trade.bothLocked(active.session) and Trade.confirmWait(Config, active.session, now) > 0 then
 							pushBoth(active)
 						end

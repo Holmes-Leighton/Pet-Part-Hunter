@@ -12,8 +12,10 @@ local Trade = require("./Trade")
 
 local TradeLog = {}
 
-export type ItemRecord = { id: string, tier: number, stats: { speed: number, bag: number, coin: number, luck: number } }
-export type PetRecord = { slots: { [string]: ItemRecord } }
+-- uid is the giver's id for the item and stats are exact (not rounded): together they let a crashed trade be finished
+-- from the record alone (Shared/TradeRecovery).
+export type ItemRecord = { uid: number, id: string, tier: number, stats: { speed: number, bag: number, coin: number, luck: number } }
+export type PetRecord = { uid: number, slots: { [string]: ItemRecord } }
 export type SideRecord = { name: string, value: number, parts: { ItemRecord }, pets: { PetRecord } }
 export type Record = {
 	v: number, -- record format version
@@ -41,9 +43,10 @@ end
 
 local function itemRecord(item: Crafting.Item): ItemRecord
 	return {
+		uid = item.uid,
 		id = item.id,
 		tier = item.tier,
-		stats = { speed = round2(item.stats.speed), bag = round2(item.stats.bag), coin = round2(item.stats.coin), luck = round2(item.stats.luck) },
+		stats = { speed = item.stats.speed, bag = item.stats.bag, coin = item.stats.coin, luck = item.stats.luck },
 	}
 end
 
@@ -71,7 +74,7 @@ function TradeLog.build(
 			for socket, item in pet.slots do
 				slots[socket] = itemRecord(item)
 			end
-			table.insert(pets, { slots = slots })
+			table.insert(pets, { uid = pet.uid, slots = slots })
 		end
 		sides[tostring(party.userId)] = { name = party.name, value = round2(evaluation.value[party.userId] or 0), parts = parts, pets = pets }
 	end
@@ -104,6 +107,12 @@ end
 -- The DataStore key for a record: sorts by time and stays unique per trade.
 function TradeLog.key(rec: Record): string
 	return string.format("T%011d_%s", rec.t, rec.id)
+end
+
+-- The key of the record that supersedes this one when a trade was logged as completed but the swap was then rejected
+-- (same time, id + "_f"). Recovery checks it before finishing a committed trade.
+function TradeLog.supersededKey(rec: Record): string
+	return string.format("T%011d_%s_f", rec.t, rec.id)
 end
 
 -- A short per-player index entry, so one player's trade history is a single lookup instead of a scan.

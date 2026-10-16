@@ -142,16 +142,20 @@ function TradeLogger.history(userId: number): { TradeLog.IndexEntry }
 	return if ok and type(list) == "table" then list else {}
 end
 
--- Reads one full record by its key (TradeLog.key), for support investigations.
-function TradeLogger.get(key: string): TradeLog.Record?
+-- Reads one full record by its key (TradeLog.key). The second value tells "not found" (true) apart from "could not
+-- read" (false): crash recovery must not treat a failed read as "no record".
+function TradeLogger.get(key: string): (TradeLog.Record?, boolean)
 	local s = getStore()
 	if s == nil then
-		return nil
+		return nil, RunService:IsStudio() -- nowhere to have stored anything in Studio; in production that is a failure
 	end
 	local ok, rec = pcall(function()
 		return s:GetAsync(key)
 	end)
-	return if ok then rec else nil
+	if not ok then
+		return nil, false
+	end
+	return rec, true
 end
 
 return TradeLogger
